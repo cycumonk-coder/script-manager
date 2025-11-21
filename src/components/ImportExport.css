@@ -1,0 +1,85 @@
+.import-export {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 32px;
+  margin-top: 32px;
+  border: 1px solid #e5e7eb;
+}
+
+.import-export-header {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.import-export-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.export-btn {
+  background: #ffffff;
+  color: #6366f1;
+  border: 1px solid #6366f1;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  background: #f3f4f6;
+}
+
+.export-btn.primary {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+.export-btn.primary:hover {
+  background: #4f46e5;
+}
+
+.import-btn {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-block;
+}
+
+.import-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+@media (max-width: 768px) {
+  .import-export {
+    padding: 24px;
+  }
+
+  .import-export-actions {
+    flex-direction: column;
+  }
+
+  .export-btn,
+  .import-btn {
+    width: 100%;
+  }
+}
+

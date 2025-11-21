@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth 設定診斷工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #6366f1;
+            padding-bottom: 10px;
+        }
+        .check-item {
+            background: #f9fafb;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border-left: 4px solid #6366f1;
+        }
+        .check-item h3 {
+            margin-top: 0;
+            color: #111827;
+        }
+        .check-item code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .status.ok {
+            background: #d1fae5;
+            color: #059669;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #4f46e5;
+        }
+        .result {
+            background: #fefce8;
+            border: 1px solid #fef08a;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        ol {
+            line-height: 1.8;
+        }
+        a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 OAuth 設定診斷工具</h1>
+        
+        <div class="check-item">
+            <h3>步驟 1：檢查當前 Client ID</h3>
+            <p>當前存儲的 Client ID：</p>
+            <div id="clientIdDisplay" class="result"></div>
+            <button class="button" onclick="checkClientId()">檢查 Client ID</button>
+        </div>
+
+        <div class="check-item">
+            <h3>步驟 2：驗證 Google Cloud Console 設定</h3>
+            <p>請在 <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a> 中確認以下設定：</p>
+            <ol>
+                <li><strong>找到您的 OAuth 客戶端</strong>
+                    <ul>
+                        <li>Client ID：<code>859362486554-eohfkl8ej49qih16sasodn833q4som9t</code></li>
+                        <li>如果找不到，可能被刪除了，需要重新創建</li>
+                    </ul>
+                </li>
+                <li><strong>點擊編輯（鉛筆圖示）</strong></li>
+                <li><strong>確認「應用程式類型」為「網頁應用程式」</strong>
+                    <ul>
+                        <li>如果不是，請刪除並重新創建</li>
+                    </ul>
+                </li>
+                <li><strong>在「已授權的 JavaScript 來源」中必須包含：</strong>
+                    <ul>
+                        <li><code>http://localhost:3001</code></li>
+                        <li>⚠️ 不能有尾隨斜線</li>
+                        <li>⚠️ 必須是 http 不是 https</li>
+                        <li>⚠️ 端口必須是 3001</li>
+                    </ul>
+                </li>
+                <li><strong>點擊「儲存」</strong></li>
+                <li><strong>等待 1-2 分鐘讓更改生效</strong></li>
+            </ol>
+            <button class="button" onclick="window.open('https://console.cloud.google.com/apis/credentials', '_blank')">打開 Google Cloud Console</button>
+        </div>
+
+        <div class="check-item">
+            <h3>步驟 3：檢查 OAuth 同意畫面</h3>
+            <ol>
+                <li>前往 <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank">OAuth 同意畫面</a></li>
+                <li>確認狀態不是「草稿」</li>
+                <li>點擊「測試使用者」標籤</li>
+                <li>確認 <code>cycumonk@gmail.com</code> 在列表中</li>
+                <li>如果不在，點擊「新增使用者」添加</li>
+            </ol>
+            <button class="button" onclick="window.open('https://console.cloud.google.com/apis/credentials/consent', '_blank')">打開 OAuth 同意畫面</button>
+        </div>
+
+        <div class="check-item">
+            <h3>步驟 4：清除快取並重置</h3>
+            <p>清除所有本地儲存的 OAuth 資料：</p>
+            <button class="button" onclick="clearAll()">清除所有 OAuth 資料</button>
+            <button class="button" onclick="setClientId()">重新設定 Client ID</button>
+            <div id="clearResult"></div>
+        </div>
+
+        <div class="check-item">
+            <h3>步驟 5：測試當前網址</h3>
+            <p>當前網址：<code id="currentUrl"></code></p>
+            <p>預期網址：<code>http://localhost:3001</code></p>
+            <div id="urlCheck"></div>
+        </div>
+
+        <div id="summary" class="result" style="display:none;">
+            <h3>診斷結果</h3>
+            <div id="summaryContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_CLIENT_ID = '859362486554-eohfkl8ej49qih16sasodn833q4som9t.apps.googleusercontent.com';
+        
+        function checkClientId() {
+            const storedId = localStorage.getItem('google_client_id');
+            const display = document.getElementById('clientIdDisplay');
+            
+            if (storedId) {
+                display.innerHTML = `
+                    <p><strong>✅ 找到 Client ID：</strong></p>
+                    <code>${storedId}</code>
+                    <p style="margin-top: 10px;">格式檢查：${storedId.includes('.apps.googleusercontent.com') ? '✅ 正確' : '❌ 格式錯誤'}</p>
+                    <p>與預設值比對：${storedId === DEFAULT_CLIENT_ID ? '✅ 一致' : '⚠️ 不一致'}</p>
+                `;
+            } else {
+                display.innerHTML = `
+                    <p><strong>❌ 未找到 Client ID</strong></p>
+                    <p>將使用預設值：<code>${DEFAULT_CLIENT_ID}</code></p>
+                `;
+            }
+        }
+
+        function clearAll() {
+            localStorage.removeItem('google_client_id');
+            localStorage.removeItem('google_access_token');
+            localStorage.removeItem('google_sheet_id');
+            
+            document.getElementById('clearResult').innerHTML = `
+                <div class="result" style="margin-top: 10px;">
+                    ✅ 已清除所有 OAuth 相關資料<br>
+                    請重新整理頁面
+                </div>
+            `;
+        }
+
+        function setClientId() {
+            localStorage.setItem('google_client_id', DEFAULT_CLIENT_ID);
+            document.getElementById('clearResult').innerHTML = `
+                <div class="result" style="margin-top: 10px;">
+                    ✅ 已設定 Client ID：<code>${DEFAULT_CLIENT_ID}</code><br>
+                    請重新整理頁面
+                </div>
+            `;
+        }
+
+        function checkUrl() {
+            const current = window.location.href;
+            const expected = 'http://localhost:3001';
+            const display = document.getElementById('urlCheck');
+            const urlDisplay = document.getElementById('currentUrl');
+            
+            urlDisplay.textContent = current;
+            
+            if (current.includes('localhost:3001')) {
+                display.innerHTML = '<span class="status ok">✅ 網址正確</span>';
+            } else {
+                display.innerHTML = `
+                    <span class="status error">❌ 網址不正確</span>
+                    <p style="color: #dc2626; margin-top: 10px;">
+                        當前網址是：${current}<br>
+                        應該使用：${expected}<br>
+                        請確認應用程式運行在正確的端口
+                    </p>
+                `;
+            }
+        }
+
+        // 初始化
+        window.onload = function() {
+            checkClientId();
+            checkUrl();
+            
+            // 顯示摘要
+            const summary = document.getElementById('summary');
+            const summaryContent = document.getElementById('summaryContent');
+            summary.style.display = 'block';
+            
+            const storedId = localStorage.getItem('google_client_id') || DEFAULT_CLIENT_ID;
+            const currentUrl = window.location.href;
+            
+            summaryContent.innerHTML = `
+                <h4>📋 檢查清單</h4>
+                <ol>
+                    <li>Client ID 已設定 ${storedId === DEFAULT_CLIENT_ID ? '✅' : '⚠️'}</li>
+                    <li>網址正確 ${currentUrl.includes('localhost:3001') ? '✅' : '❌'}</li>
+                    <li>Google Cloud Console 設定（需要手動檢查）</li>
+                    <li>OAuth 同意畫面設定（需要手動檢查）</li>
+                </ol>
+                <p><strong>下一步：</strong></p>
+                <ol>
+                    <li>確認 Google Cloud Console 中「已授權的 JavaScript 來源」包含 <code>http://localhost:3001</code></li>
+                    <li>確認應用程式類型為「網頁應用程式」</li>
+                    <li>確認 OAuth 同意畫面已設定且添加了測試使用者</li>
+                    <li>點擊「清除所有 OAuth 資料」按鈕</li>
+                    <li>重新整理頁面並嘗試連接</li>
+                </ol>
+            `;
+        };
+    </script>
+</body>
+</html>
+

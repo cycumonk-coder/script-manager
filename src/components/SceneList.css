@@ -1,0 +1,256 @@
+.scene-list {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 32px;
+  margin-bottom: 32px;
+  border: 1px solid #e5e7eb;
+}
+
+.scene-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.scene-list-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.scene-list-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-item {
+  font-size: 13px;
+  color: #6b7280;
+  padding: 6px 12px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.stat-text {
+  font-size: 13px;
+}
+
+.add-scene-btn {
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 40px;
+}
+
+.add-scene-btn:hover {
+  background: #4f46e5;
+}
+
+.add-scene-btn:active {
+  transform: translateY(0);
+}
+
+.scenes-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.scene-item {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #6366f1;
+  border-radius: 6px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  min-height: 100px;
+}
+
+.scene-item:hover {
+  border-color: #d1d5db;
+  border-left-color: #6366f1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.scene-item:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.scene-item.completed {
+  background: #ffffff;
+  border-left-color: #059669;
+}
+
+.scene-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.scene-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.large-checkbox {
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  accent-color: #28a745;
+  transform: scale(1.2);
+}
+
+.scene-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.scene-item.completed .scene-number {
+  color: #059669;
+}
+
+.delete-scene-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  color: #6b7280;
+  font-weight: 300;
+}
+
+.delete-scene-btn:hover {
+  background: #f3f4f6;
+  color: #dc2626;
+}
+
+.scene-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.scene-beat-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #6366f1;
+  background: #eef2ff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scene-preview {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.completed-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #059669;
+  color: #ffffff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+  grid-column: 1 / -1;
+}
+
+.empty-state p {
+  font-size: 14px;
+  margin: 0;
+  font-weight: 400;
+}
+
+@media (max-width: 768px) {
+  .scene-list {
+    padding: 24px;
+  }
+
+  .scene-list-title {
+    font-size: 28px;
+  }
+
+  .scene-list-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .stat-item {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .add-scene-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .scenes-container {
+    grid-template-columns: 1fr;
+  }
+
+  .scene-item {
+    padding: 20px;
+  }
+
+  .scene-title {
+    font-size: 18px;
+  }
+}
+

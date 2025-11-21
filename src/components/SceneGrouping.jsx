@@ -1,0 +1,242 @@
+import { useState, useMemo } from 'react';
+import './SceneGrouping.css';
+
+const SceneGrouping = ({ scenes, onSelectScene }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
+  const [compositionValue, setCompositionValue] = useState('');
+
+  // 提取場景名稱/地點的關鍵字
+  const extractLocationKeywords = (text) => {
+    if (!text) return [];
+    
+    const keywords = new Set();
+    
+    // 1. 檢查標題中的場景名稱（格式：場景名稱：描述 或 場景名稱 - 描述）
+    const titleMatch = text.match(/^(.+?)(?:[：:：\-—]|$)/);
+    if (titleMatch && titleMatch[1]) {
+      const title = titleMatch[1].trim();
+      // 過濾掉太短或太長的標題
+      if (title.length > 1 && title.length < 30 && !title.match(/^(場次|第|Scene)/i)) {
+        keywords.add(title);
+      }
+    }
+    
+    // 2. 常見場景標記詞模式
+    const locationPatterns = [
+      // 在/於/到 + 地點
+      /(?:在|於|到|從|前往|回到|離開|進入|走出|來到|抵達)([^，。！？\n、，]+?)(?:[，。！？\n]|$)/g,
+      // 地點 + 內/外/中/裡/前/後/上/下
+      /([^：:：\n]+?)(?:的)?(?:內|外|中|裡|前|後|上|下|門口|門口|大廳|房間|辦公室|教室|餐廳|咖啡廳|公園|街道|車站|機場|醫院|學校|公司|家|房間|客廳|臥室|廚房|浴室)(?:[，。！？\n]|$)/g,
+      // 場景/地點/位置 + 名稱
+      /(?:場景|地點|位置|場所|地點)(?:：|:)?([^，。！？\n]+?)(?:[，。！？\n]|$)/g,
+      // INT./EXT. 格式（好萊塢格式）
+      /(?:INT\.|EXT\.|內景|外景)\s*[：:：]?\s*([^，。！？\n]+?)(?:[，。！？\n]|$)/gi,
+    ];
+    
+    locationPatterns.forEach(pattern => {
+      let match;
+      // 重置正則表達式的 lastIndex
+      pattern.lastIndex = 0;
+      while ((match = pattern.exec(text)) !== null) {
+        const keyword = match[1]?.trim();
+        // 過濾掉常見的無意義詞彙
+        const stopWords = ['的', '了', '是', '有', '在', '和', '與', '或', '但', '而', '這', '那', '一個', '一些', '什麼', '如何', '為什麼'];
+        if (keyword && 
+            keyword.length > 1 && 
+            keyword.length < 25 && 
+            !stopWords.includes(keyword) &&
+            !keyword.match(/^\d+$/) && // 排除純數字
+            !keyword.match(/^[a-zA-Z]+$/) && // 排除純英文單詞（除非是專有名詞）
+            keyword.length > 2) { // 至少3個字元
+          keywords.add(keyword);
+        }
+      }
+    });
+    
+    // 3. 提取引號內的場景名稱
+    const quotedMatches = text.match(/["「『]([^"」』]+?)["」』]/g);
+    if (quotedMatches) {
+      quotedMatches.forEach(match => {
+        const quoted = match.replace(/["「『」』]/g, '').trim();
+        if (quoted.length > 2 && quoted.length < 25) {
+          keywords.add(quoted);
+        }
+      });
+    }
+    
+    return Array.from(keywords);
+  };
+
+  // 只在有搜尋關鍵字時才進行分組和過濾
+  const filteredGroups = useMemo(() => {
+    if (!scenes || scenes.length === 0) return {};
+    
+    // 如果沒有搜尋關鍵字，返回空物件（不顯示任何分組）
+    if (!searchTerm.trim()) return {};
+
+    const groups = {};
+    const searchLower = searchTerm.toLowerCase();
+    
+    // 遍歷所有場景，找出包含搜尋關鍵字的場景
+    scenes.forEach(scene => {
+      const sceneText = `${scene.title || ''} ${scene.content || ''} ${scene.location || ''}`.toLowerCase();
+      
+      // 如果場景內容包含搜尋關鍵字
+      if (sceneText.includes(searchLower)) {
+        // 提取場景關鍵字
+        const keywords = extractLocationKeywords(`${scene.title || ''} ${scene.content || ''}`);
+        
+        // 如果找到關鍵字，使用關鍵字作為分組
+        if (keywords.length > 0) {
+          keywords.forEach(keyword => {
+            if (keyword.toLowerCase().includes(searchLower) || sceneText.includes(searchLower)) {
+              if (!groups[keyword]) {
+                groups[keyword] = [];
+              }
+              // 避免重複添加
+              if (!groups[keyword].find(s => s.id === scene.id)) {
+                groups[keyword].push(scene);
+              }
+            }
+          });
+        } else {
+          // 如果沒有關鍵字，使用場景標題或"未分類"
+          const fallbackKey = scene.title || '未分類場景';
+          if (!groups[fallbackKey]) {
+            groups[fallbackKey] = [];
+          }
+          if (!groups[fallbackKey].find(s => s.id === scene.id)) {
+            groups[fallbackKey].push(scene);
+          }
+        }
+      }
+    });
+
+    return groups;
+  }, [scenes, searchTerm]);
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    if (isComposing) {
+      setCompositionValue(value);
+      return;
+    }
+    setSearchTerm(value);
+  };
+
+  const handleSearchCompositionStart = () => {
+    setIsComposing(true);
+  };
+
+  const handleSearchCompositionEnd = (e) => {
+    setIsComposing(false);
+    setSearchTerm(e.target.value);
+    setCompositionValue('');
+  };
+
+  const sortedGroups = Object.entries(filteredGroups).sort((a, b) => {
+    // 按場景數量排序，多的在前
+    if (b[1].length !== a[1].length) {
+      return b[1].length - a[1].length;
+    }
+    // 如果數量相同，按名稱排序
+    return a[0].localeCompare(b[0], 'zh-TW');
+  });
+
+  const handleSubmitNewScene = () => {
+    if (!newScene.beatId) {
+      alert('請選擇大綱');
+      return;
+    }
+    if (onAddScene) {
+      const sceneToAdd = {
+        ...newScene,
+        id: Date.now(),
+        beatId: newScene.beatId,
+      };
+      onAddScene(sceneToAdd);
+      // 重置表單
+      setNewScene({
+        number: scenes.length + 2,
+        dayNight: '',
+        beatId: '',
+        title: '',
+        content: '',
+        location: '',
+        completed: false,
+      });
+      setShowAddForm(false);
+    }
+  };
+
+  return (
+    <div className="scene-grouping">
+      <div className="scene-grouping-header">
+        <h3 className="section-title">場景統整</h3>
+        <div className="scene-grouping-search">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="搜尋場景名稱或地點..."
+            value={isComposing ? (compositionValue || searchTerm) : searchTerm}
+            onChange={handleSearchChange}
+            onCompositionStart={handleSearchCompositionStart}
+            onCompositionEnd={handleSearchCompositionEnd}
+          />
+        </div>
+      </div>
+
+      {!searchTerm.trim() ? (
+        <div className="scene-grouping-empty">
+          <p>請在搜尋框中輸入關鍵字來查找相關場景</p>
+          {scenes && scenes.length === 0 && (
+            <p className="empty-hint">請先添加場次內容</p>
+          )}
+        </div>
+      ) : sortedGroups.length === 0 ? (
+        <div className="scene-grouping-empty">
+          <p>目前沒有找到相關的場景分組</p>
+        </div>
+      ) : (
+        <div className="scene-grouping-content">
+          {sortedGroups.map(([location, sceneList]) => (
+            <div key={location} className="scene-group">
+              <div className="scene-group-header">
+                <h4 className="scene-group-title">
+                  {location}
+                  <span className="scene-count-badge">{sceneList.length}</span>
+                </h4>
+              </div>
+              <div className="scene-group-list">
+                {sceneList.map(scene => (
+                  <div
+                    key={scene.id}
+                    className="scene-group-item"
+                    onClick={() => onSelectScene && onSelectScene(scene)}
+                  >
+                    <div className="scene-item-header">
+                      <span className="scene-item-number">場次 {scene.number}</span>
+                      {scene.title && (
+                        <span className="scene-item-title">{scene.title}</span>
+                      )}
+                    </div>
+                    {scene.content && (
+                      <div className="scene-item-preview">
+                        {scene.content.substring(0, 100)}
+                        {scene.content.length > 100 && '...'}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SceneGrouping;
+

@@ -1,0 +1,241 @@
+.settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.settings-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.settings-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-header-title svg {
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.settings-close-btn {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #6b7280;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.settings-close-btn:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.settings-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 0 28px;
+}
+
+.settings-tab {
+  background: none;
+  border: none;
+  padding: 16px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+  top: 1px;
+}
+
+.settings-tab:hover {
+  color: #111827;
+  background: #f9fafb;
+}
+
+.settings-tab.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+  background: #ffffff;
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+}
+
+.settings-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.settings-section {
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+}
+
+.settings-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.settings-description {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.settings-description a {
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.settings-description a:hover {
+  text-decoration: underline;
+}
+
+.api-key-input-group {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.api-key-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  color: #111827;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.api-key-save-btn {
+  padding: 10px 20px;
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.api-key-save-btn:hover {
+  background: #4f46e5;
+}
+
+.api-key-hint {
+  margin: 8px 0 0 0;
+  font-size: 13px;
+  color: #059669;
+  font-weight: 500;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.clear-all-btn {
+  padding: 10px 20px;
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-all-btn:hover {
+  background: #fef2f2;
+  border-color: #b91c1c;
+}
+
+.settings-warning {
+  margin: 16px 0 0 0;
+  padding: 12px;
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #713f12;
+  line-height: 1.6;
+}
+
+/* 整合 GoogleSheetsAuth 的樣式調整 */
+.settings-section .google-sheets-auth {
+  margin-top: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
