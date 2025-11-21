@@ -32,6 +32,9 @@ dist-ssr
 .vite
 build
 
+# Vercel
+.vercel
+
 # OS files
 Thumbs.db
 

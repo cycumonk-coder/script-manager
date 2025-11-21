@@ -105,10 +105,24 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
     };
 
     console.log('➕ [CharacterRelationship] 新增角色:', newChar);
-    const updatedCharacters = [...characters, newChar];
+    console.log('➕ [CharacterRelationship] 現有角色數量:', characters.length);
+    
+    // 確保 characters 是陣列
+    const currentCharacters = Array.isArray(characters) ? characters : [];
+    const updatedCharacters = [...currentCharacters, newChar];
+    
+    console.log('➕ [CharacterRelationship] 更新後角色數量:', updatedCharacters.length);
+    console.log('➕ [CharacterRelationship] 更新後角色列表:', updatedCharacters);
+    
     if (onUpdateCharacters) {
-      console.log('📤 [CharacterRelationship] 調用 onUpdateCharacters:', updatedCharacters);
+      console.log('📤 [CharacterRelationship] 調用 onUpdateCharacters，傳遞', updatedCharacters.length, '個角色');
+      // 使用 setTimeout 確保狀態更新
       onUpdateCharacters(updatedCharacters);
+      
+      // 驗證更新是否成功
+      setTimeout(() => {
+        console.log('✅ [CharacterRelationship] 角色新增完成，請檢查父組件狀態');
+      }, 100);
     } else {
       console.error('❌ [CharacterRelationship] onUpdateCharacters 不存在！');
     }

@@ -76,40 +76,29 @@ const SceneGrouping = ({ scenes, onSelectScene }) => {
     if (!searchTerm.trim()) return {};
 
     const groups = {};
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = searchTerm.toLowerCase().trim();
     
-    // 遍歷所有場景，找出包含搜尋關鍵字的場景
+    // 用於追蹤已經添加的場景，避免重複
+    const addedSceneIds = new Set();
+    
+    // 遍歷所有場景，只檢查場景地點欄位
     scenes.forEach(scene => {
-      const sceneText = `${scene.title || ''} ${scene.content || ''} ${scene.location || ''}`.toLowerCase();
+      // 只檢查場景地點欄位是否包含搜尋關鍵字
+      const location = (scene.location || '').toLowerCase().trim();
       
-      // 如果場景內容包含搜尋關鍵字
-      if (sceneText.includes(searchLower)) {
-        // 提取場景關鍵字
-        const keywords = extractLocationKeywords(`${scene.title || ''} ${scene.content || ''}`);
+      // 如果場景地點包含搜尋關鍵字，且該場景尚未被添加
+      if (location && location.includes(searchLower) && !addedSceneIds.has(scene.id)) {
+        // 使用場景地點作為分組鍵
+        const groupKey = scene.location || '未分類場景';
         
-        // 如果找到關鍵字，使用關鍵字作為分組
-        if (keywords.length > 0) {
-          keywords.forEach(keyword => {
-            if (keyword.toLowerCase().includes(searchLower) || sceneText.includes(searchLower)) {
-              if (!groups[keyword]) {
-                groups[keyword] = [];
-              }
-              // 避免重複添加
-              if (!groups[keyword].find(s => s.id === scene.id)) {
-                groups[keyword].push(scene);
-              }
-            }
-          });
-        } else {
-          // 如果沒有關鍵字，使用場景標題或"未分類"
-          const fallbackKey = scene.title || '未分類場景';
-          if (!groups[fallbackKey]) {
-            groups[fallbackKey] = [];
-          }
-          if (!groups[fallbackKey].find(s => s.id === scene.id)) {
-            groups[fallbackKey].push(scene);
-          }
+        if (!groups[groupKey]) {
+          groups[groupKey] = [];
         }
+        
+        // 添加到對應的分組
+        groups[groupKey].push(scene);
+        // 標記為已添加，避免重複
+        addedSceneIds.add(scene.id);
       }
     });
 
@@ -178,7 +167,7 @@ const SceneGrouping = ({ scenes, onSelectScene }) => {
           <input
             type="text"
             className="search-input"
-            placeholder="搜尋場景名稱或地點..."
+            placeholder="搜尋場景地點..."
             value={isComposing ? (compositionValue || searchTerm) : searchTerm}
             onChange={handleSearchChange}
             onCompositionStart={handleSearchCompositionStart}

@@ -13,6 +13,7 @@ import {
   saveProjectData,
   setSpreadsheetId 
 } from '../services/googleSheets';
+import { debugLocalStorage } from '../utils/debugLocalStorage';
 import './ScriptManager.css';
 
 const ScriptManager = () => {
@@ -81,6 +82,16 @@ const ScriptManager = () => {
           }
         }
 
+        // 檢查 localStorage 是否可用
+        if (!debugLocalStorage.isAvailable()) {
+          console.error('❌ localStorage 不可用，無法載入資料');
+          isInitialLoadRef.current = false;
+          return;
+        }
+
+        // 檢查 localStorage 使用情況
+        debugLocalStorage.checkUsage();
+
         // 從 localStorage 載入（作為備份或首次使用）
         const savedScriptData = localStorage.getItem('scriptData');
         const savedOutline = localStorage.getItem('scriptOutline');
@@ -89,8 +100,9 @@ const ScriptManager = () => {
         const savedConnections = localStorage.getItem('characterConnections');
         
         console.log('🔵 [ScriptManager] 開始載入人物關係圖資料...');
+        console.log('🔵 [ScriptManager] localStorage 中的 characters:', savedCharacters ? '存在' : '不存在');
 
-        if (savedScriptData) {
+    if (savedScriptData) {
           try {
             const parsedData = JSON.parse(savedScriptData);
             console.log('📂 從 localStorage 載入 scriptData:', parsedData);
@@ -108,25 +120,44 @@ const ScriptManager = () => {
           }
         } else {
           console.log('ℹ️ localStorage 中沒有 scriptData，使用預設值');
-        }
-        if (savedOutline) {
-          setOutline(JSON.parse(savedOutline));
-        }
-        if (savedScenes) {
-          const loadedScenes = JSON.parse(savedScenes);
-          setScenes(loadedScenes);
+    }
+    if (savedOutline) {
+      setOutline(JSON.parse(savedOutline));
+    }
+    if (savedScenes) {
+      const loadedScenes = JSON.parse(savedScenes);
+      setScenes(loadedScenes);
           // 不再自動更新總場次數，由用戶手動輸入
         }
         if (savedCharacters) {
           try {
             const parsed = JSON.parse(savedCharacters);
-            console.log('✅ [ScriptManager] 載入角色資料:', parsed.length, '個角色', parsed);
-            setCharacters(parsed);
+            console.log('✅ [ScriptManager] 解析角色資料成功:', parsed);
+            console.log('✅ [ScriptManager] 角色資料類型:', typeof parsed, Array.isArray(parsed) ? '(陣列)' : '(非陣列)');
+            console.log('✅ [ScriptManager] 角色數量:', parsed.length);
+            
+            // 確保是陣列且不是空值
+            if (Array.isArray(parsed)) {
+              if (parsed.length > 0) {
+                console.log('✅ [ScriptManager] 載入', parsed.length, '個角色:', parsed.map(c => c.name || '無名'));
+                setCharacters(parsed);
+                console.log('✅ [ScriptManager] 成功設置角色資料到狀態');
+              } else {
+                console.log('⚠️ [ScriptManager] 角色資料是空陣列');
+                setCharacters([]);
+              }
+            } else {
+              console.error('❌ [ScriptManager] 角色資料格式錯誤，不是陣列:', typeof parsed, parsed);
+              setCharacters([]);
+            }
           } catch (e) {
-            console.error('❌ [ScriptManager] 載入角色資料失敗:', e);
+            console.error('❌ [ScriptManager] 解析角色資料失敗:', e);
+            console.error('❌ [ScriptManager] 原始資料:', savedCharacters.substring(0, 200));
+            setCharacters([]);
           }
         } else {
-          console.log('⚠️ [ScriptManager] 沒有找到角色資料');
+          console.log('⚠️ [ScriptManager] localStorage 中沒有角色資料');
+          setCharacters([]);
         }
         
         if (savedConnections) {
@@ -221,7 +252,7 @@ const ScriptManager = () => {
     
     // 立即保存到 localStorage（無延遲）
     try {
-      localStorage.setItem('scriptOutline', JSON.stringify(outline));
+    localStorage.setItem('scriptOutline', JSON.stringify(outline));
       console.log('✅ outline 已保存到 localStorage');
     } catch (err) {
       console.error('保存 outline 到 localStorage 失敗:', err);
@@ -247,7 +278,7 @@ const ScriptManager = () => {
     
     // 立即保存到 localStorage（無延遲）
     try {
-      localStorage.setItem('scriptScenes', JSON.stringify(scenes));
+    localStorage.setItem('scriptScenes', JSON.stringify(scenes));
       console.log('✅ scenes 已保存到 localStorage');
     } catch (err) {
       console.error('保存 scenes 到 localStorage 失敗:', err);
@@ -257,8 +288,8 @@ const ScriptManager = () => {
     const completedCount = scenes.length;
     setScriptData((prev) => {
       const updated = {
-        ...prev,
-        completedScenes: completedCount,
+      ...prev,
+      completedScenes: completedCount,
         // 總場次數保持用戶輸入的值不變
       };
       // 立即保存到 localStorage
@@ -293,13 +324,52 @@ const ScriptManager = () => {
       return;
     }
     
+    // 確保 characters 是陣列
+    if (!Array.isArray(characters)) {
+      console.error('❌ [ScriptManager] characters 不是陣列:', typeof characters, characters);
+      return;
+    }
+    
     // 立即保存到 localStorage（無延遲）
     try {
-      console.log('💾 [ScriptManager] 保存角色資料:', characters.length, '個角色', characters);
-      localStorage.setItem('characters', JSON.stringify(characters));
-      console.log('✅ [ScriptManager] 角色資料保存成功');
+      console.log('💾 [ScriptManager] 開始保存角色資料:', characters.length, '個角色');
+      console.log('💾 [ScriptManager] 角色詳細列表:', characters.map(c => ({ id: c.id, name: c.name })));
+      
+      // 使用調試工具保存
+      const saved = debugLocalStorage.setItem('characters', characters);
+      
+      if (saved) {
+        // 立即驗證保存是否成功
+        const verified = debugLocalStorage.getItem('characters');
+        if (verified && Array.isArray(verified)) {
+          console.log('✅ [ScriptManager] 角色資料保存並驗證成功:', verified.length, '個角色');
+          
+          if (verified.length !== characters.length) {
+            console.error('❌ [ScriptManager] 保存的角色數量不一致！', {
+              原始: characters.length,
+              保存後: verified.length,
+              原始角色: characters.map(c => c.name),
+              保存後角色: verified.map(c => c.name)
+            });
+            
+            // 嘗試重新保存
+            console.log('🔄 [ScriptManager] 嘗試重新保存...');
+            debugLocalStorage.setItem('characters', characters);
+          } else {
+            console.log('✅ [ScriptManager] 角色資料完整保存成功');
+          }
+        } else {
+          console.error('❌ [ScriptManager] 驗證失敗：保存的資料不是陣列或為空');
+        }
+      } else {
+        console.error('❌ [ScriptManager] 保存失敗');
+      }
     } catch (err) {
       console.error('❌ [ScriptManager] 保存角色資料失敗:', err);
+      // 如果 localStorage 空間不足，提示用戶
+      if (err.name === 'QuotaExceededError') {
+        alert('儲存空間不足，請清除瀏覽器資料或刪除部分角色');
+      }
     }
     
     // 延遲保存到雲端
@@ -427,8 +497,8 @@ const ScriptManager = () => {
     <div className="script-manager">
       <div className="script-manager-header">
         <div className="header-left">
-          <h1 className="app-title">劇本寫作管理</h1>
-          <p className="app-subtitle">管理寫作進度，專注創作</p>
+        <h1 className="app-title">劇本寫作管理</h1>
+        <p className="app-subtitle">管理寫作進度，專注創作</p>
         </div>
         <button 
           className="settings-toggle-btn"
@@ -457,8 +527,8 @@ const ScriptManager = () => {
           onUpdateScriptData={handleUpdateScriptData}
         />
 
-        <ScriptOutline
-          outline={outline}
+        <ScriptOutline 
+          outline={outline} 
           onUpdateOutline={handleUpdateOutline}
           scenes={scenes}
           onSelectScene={handleSelectScene}
@@ -501,8 +571,39 @@ const ScriptManager = () => {
         <CharacterRelationship 
           characters={characters}
           connections={characterConnections}
-          onUpdateCharacters={setCharacters}
-          onUpdateConnections={setCharacterConnections}
+          onUpdateCharacters={(updatedCharacters) => {
+            console.log('🔄 [ScriptManager] 收到角色更新:', updatedCharacters.length, '個角色');
+            console.log('🔄 [ScriptManager] 更新前角色數量:', characters.length);
+            console.log('🔄 [ScriptManager] 更新後角色數量:', updatedCharacters.length);
+            console.log('🔄 [ScriptManager] 角色詳細資料:', updatedCharacters);
+            
+            // 確保是陣列
+            if (!Array.isArray(updatedCharacters)) {
+              console.error('❌ [ScriptManager] 接收到的角色資料不是陣列:', typeof updatedCharacters);
+              return;
+            }
+            
+            setCharacters(updatedCharacters);
+            
+            // 立即驗證
+            setTimeout(() => {
+              const current = localStorage.getItem('characters');
+              if (current) {
+                const parsed = JSON.parse(current);
+                console.log('✅ [ScriptManager] 更新後驗證 localStorage:', parsed.length, '個角色');
+                if (parsed.length !== updatedCharacters.length) {
+                  console.error('❌ [ScriptManager] 角色數量不一致！', {
+                    狀態: updatedCharacters.length,
+                    localStorage: parsed.length
+                  });
+                }
+              }
+            }, 50);
+          }}
+          onUpdateConnections={(updatedConnections) => {
+            console.log('🔄 [ScriptManager] 收到關係更新:', updatedConnections.length, '個關係');
+            setCharacterConnections(updatedConnections);
+          }}
         />
 
         <SceneGrouping
