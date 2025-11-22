@@ -7,7 +7,8 @@ import {
   saveAccessToken,
   clearAuth,
   isAuthenticated,
-  createNewSpreadsheet
+  createNewSpreadsheet,
+  ensureFolder
 } from '../services/googleSheets';
 import './GoogleSheetsAuth.css';
 
@@ -110,15 +111,19 @@ const GoogleSheetsAuth = ({ onAuthChange, onSpreadsheetReady }) => {
           setIsSignedIn(true);
           if (onAuthChange) onAuthChange(true);
 
-          // 檢查是否有 Sheet ID，如果沒有就創建一個
+          // 檢查是否有 Sheet ID，如果沒有就創建一個（包含資料夾）
           const sheetId = getSpreadsheetId();
           if (!sheetId) {
             setCreating(true);
             try {
-              const newSheetId = await createNewSpreadsheet('劇本管理平台');
+              console.log('📁 開始創建 Google Drive 資料夾和 Google Sheet...');
+              // 創建資料夾並在其中創建 Google Sheet
+              const newSheetId = await createNewSpreadsheet('劇本資料庫', '劇本管理平台');
+              console.log('✅ Google Sheet 創建成功，ID:', newSheetId);
               setLocalSpreadsheetId(newSheetId);
               if (onSpreadsheetReady) onSpreadsheetReady(newSheetId);
             } catch (err) {
+              console.error('❌ 創建 Google Sheet 失敗:', err);
               setError('創建 Google Sheet 失敗: ' + err.message);
             } finally {
               setCreating(false);

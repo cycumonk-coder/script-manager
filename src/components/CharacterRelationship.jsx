@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './CharacterRelationship.css';
+import ImagePositionEditor from './ImagePositionEditor';
 
 const CharacterRelationship = ({ characters = [], connections = [], onUpdateCharacters, onUpdateConnections }) => {
   const [draggingId, setDraggingId] = useState(null);
@@ -9,9 +10,16 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
   const [connectionLabel, setConnectionLabel] = useState('');
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newCharacter, setNewCharacter] = useState({ name: '', personality: '', image: null });
+  const [newCharacter, setNewCharacter] = useState({ name: '', personality: '', image: null, uploading: false, imagePosition: null });
   const [editingCharacter, setEditingCharacter] = useState(null);
-  const [editCharacterForm, setEditCharacterForm] = useState({ name: '', personality: '', image: null });
+  const [editCharacterForm, setEditCharacterForm] = useState({ name: '', personality: '', image: null, uploading: false, imagePosition: null });
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [editingImageFor, setEditingImageFor] = useState(null); // 'new' or 'edit'
+  const [tempImageSrc, setTempImageSrc] = useState(null);
+  const [draggingAvatar, setDraggingAvatar] = useState(null); // 'new' or 'edit'
+  const [avatarDragStart, setAvatarDragStart] = useState({ x: 0, y: 0 });
+  const [avatarScale, setAvatarScale] = useState({ new: 1, edit: 1 });
+  const avatarPreviewRef = useRef({ new: null, edit: null });
   const [isComposing, setIsComposing] = useState({});
   const [compositionValues, setCompositionValues] = useState({});
   const [isComposingConnection, setIsComposingConnection] = useState(false);
@@ -59,18 +67,131 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [connectingFrom, selectedConnection, connections]);
 
-  const handleImageUpload = (e, isEdit = false) => {
-    const file = e.target.files[0];
-    if (file && file.type.startsWith('image/')) {
+  // 壓縮圖片
+  const compressImage = (file, maxWidth = 200, maxHeight = 200, quality = 0.8) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        if (isEdit) {
-          setEditCharacterForm({ ...editCharacterForm, image: event.target.result });
-        } else {
-          setNewCharacter({ ...newCharacter, image: event.target.result });
-        }
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // 計算新尺寸
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > height) {
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = (width * maxHeight) / height;
+              height = maxHeight;
+            }
+          }
+          
+          // 創建 canvas 並繪製壓縮後的圖片
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // 轉換為 base64
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedBase64);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
       };
+      reader.onerror = reject;
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (e, isEdit = false) => {
+    const file = e.target.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    
+    // 檢查檔案大小（原始檔案）
+    const maxSize = 10 * 1024 * 1024; // 10MB（因為會上傳到 Google Drive，不需要太嚴格）
+    if (file.size > maxSize) {
+      alert('圖片檔案太大，請選擇小於 10MB 的圖片');
+      return;
+    }
+    
+    try {
+      // 檢查是否已連接 Google
+      const { isAuthenticated, uploadImageToDrive } = await import('../services/googleSheets');
+      
+      if (isAuthenticated()) {
+        // 如果已連接 Google，上傳到 Google Drive
+        console.log('🖼️ [CharacterRelationship] 開始上傳圖片到 Google Drive...');
+        
+        // 先顯示壓縮後的預覽（本地）
+        const compressedImage = await compressImage(file);
+        if (isEdit) {
+          setEditCharacterForm({ ...editCharacterForm, image: compressedImage, uploading: true });
+        } else {
+          setNewCharacter({ ...newCharacter, image: compressedImage, uploading: true });
+        }
+        
+        // 後台上傳到 Google Drive
+        try {
+          const uploadResult = await uploadImageToDrive(file);
+          console.log('✅ [CharacterRelationship] 圖片上傳到 Google Drive 成功:', uploadResult.url);
+          
+          // 更新為 Google Drive URL
+          const finalImageUrl = uploadResult.url;
+          if (isEdit) {
+            setEditCharacterForm(prev => ({ 
+              ...prev, 
+              image: finalImageUrl, 
+              uploading: false,
+              imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+            }));
+          } else {
+            setNewCharacter(prev => ({ 
+              ...prev, 
+              image: finalImageUrl, 
+              uploading: false,
+              imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+            }));
+          }
+        } catch (uploadError) {
+          console.error('❌ [CharacterRelationship] 上傳到 Google Drive 失敗，使用本地圖片:', uploadError);
+          // 如果上傳失敗，繼續使用壓縮後的 base64 圖片
+          if (isEdit) {
+            setEditCharacterForm(prev => ({ ...prev, uploading: false }));
+          } else {
+            setNewCharacter(prev => ({ ...prev, uploading: false }));
+          }
+        }
+      } else {
+        // 如果未連接 Google，使用本地壓縮（舊方式）
+        console.log('🖼️ [CharacterRelationship] 未連接 Google，使用本地壓縮圖片...');
+        const compressedImage = await compressImage(file);
+        console.log('✅ [CharacterRelationship] 圖片壓縮完成');
+        console.log('📊 [CharacterRelationship] 壓縮後大小:', (compressedImage.length / 1024).toFixed(2), 'KB');
+        
+        // 未連接 Google 時，使用本地壓縮圖片
+        if (isEdit) {
+          setEditCharacterForm(prev => ({ 
+            ...prev, 
+            image: compressedImage,
+            imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+          }));
+        } else {
+          setNewCharacter(prev => ({ 
+            ...prev, 
+            image: compressedImage,
+            imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('❌ [CharacterRelationship] 圖片處理失敗:', error);
+      alert('圖片處理失敗，請重試');
     }
   };
 
@@ -79,7 +200,7 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
     console.log('✏️ [CharacterRelationship] 編輯角色:', editingCharacter);
     const updatedCharacters = characters.map(c =>
       c.id === editingCharacter
-        ? { ...c, name: editCharacterForm.name, personality: editCharacterForm.personality, image: editCharacterForm.image }
+        ? { ...c, name: editCharacterForm.name, personality: editCharacterForm.personality, image: editCharacterForm.image, imagePosition: editCharacterForm.imagePosition }
         : c
     );
     if (onUpdateCharacters) {
@@ -89,7 +210,7 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
       console.error('❌ [CharacterRelationship] onUpdateCharacters 不存在！');
     }
     setEditingCharacter(null);
-    setEditCharacterForm({ name: '', personality: '', image: null });
+    setEditCharacterForm({ name: '', personality: '', image: null, uploading: false });
   };
 
   const addCharacter = () => {
@@ -100,6 +221,8 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
       name: newCharacter.name,
       personality: newCharacter.personality,
       image: newCharacter.image,
+      imagePosition: newCharacter.imagePosition,
+      uploading: false,
       x: 100 + Math.random() * 200,
       y: 100 + Math.random() * 200,
     };
@@ -126,7 +249,7 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
     } else {
       console.error('❌ [CharacterRelationship] onUpdateCharacters 不存在！');
     }
-    setNewCharacter({ name: '', personality: '', image: null });
+    setNewCharacter({ name: '', personality: '', image: null, uploading: false });
     setShowAddForm(false);
   };
 
@@ -183,7 +306,9 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
       setEditCharacterForm({
         name: character.name,
         personality: character.personality,
-        image: character.image
+        image: character.image,
+        imagePosition: character.imagePosition || null,
+        uploading: false
       });
     }
   };
@@ -318,6 +443,104 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
     return { x: char.x, y: char.y };
   };
 
+  // 處理頭像預覽區域的拖曳
+  const handleAvatarMouseDown = (e, type) => {
+    if (e.button !== 0) return; // 只處理左鍵
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = avatarPreviewRef.current[type]?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const currentPosition = type === 'new' 
+      ? newCharacter.imagePosition || { x: 0, y: 0, scale: 1 }
+      : editCharacterForm.imagePosition || { x: 0, y: 0, scale: 1 };
+    
+    setDraggingAvatar(type);
+    setAvatarDragStart({
+      x: e.clientX - rect.left - rect.width / 2 - (currentPosition.x || 0) * 0.5,
+      y: e.clientY - rect.top - rect.height / 2 - (currentPosition.y || 0) * 0.5
+    });
+  };
+
+  const handleAvatarMouseMove = (e) => {
+    if (!draggingAvatar) return;
+    
+    const rect = avatarPreviewRef.current[draggingAvatar]?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const newX = (e.clientX - rect.left - centerX - avatarDragStart.x) * 2;
+    const newY = (e.clientY - rect.top - centerY - avatarDragStart.y) * 2;
+    
+    // 限制拖動範圍
+    const maxOffset = 100;
+    const position = {
+      x: Math.max(-maxOffset, Math.min(maxOffset, newX)),
+      y: Math.max(-maxOffset, Math.min(maxOffset, newY)),
+      scale: draggingAvatar === 'new' 
+        ? (newCharacter.imagePosition?.scale || avatarScale.new || 1)
+        : (editCharacterForm.imagePosition?.scale || avatarScale.edit || 1)
+    };
+    
+    if (draggingAvatar === 'new') {
+      setNewCharacter(prev => ({ ...prev, imagePosition: position }));
+    } else {
+      setEditCharacterForm(prev => ({ ...prev, imagePosition: position }));
+    }
+  };
+
+  const handleAvatarMouseUp = () => {
+    setDraggingAvatar(null);
+  };
+
+  const handleAvatarWheel = (e, type) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const currentScale = type === 'new'
+      ? (newCharacter.imagePosition?.scale || avatarScale.new || 1)
+      : (editCharacterForm.imagePosition?.scale || avatarScale.edit || 1);
+    
+    const newScale = Math.max(0.5, Math.min(3, currentScale + delta));
+    
+    if (type === 'new') {
+      setAvatarScale(prev => ({ ...prev, new: newScale }));
+      setNewCharacter(prev => ({
+        ...prev,
+        imagePosition: {
+          x: prev.imagePosition?.x || 0,
+          y: prev.imagePosition?.y || 0,
+          scale: newScale
+        }
+      }));
+    } else {
+      setAvatarScale(prev => ({ ...prev, edit: newScale }));
+      setEditCharacterForm(prev => ({
+        ...prev,
+        imagePosition: {
+          x: prev.imagePosition?.x || 0,
+          y: prev.imagePosition?.y || 0,
+          scale: newScale
+        }
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (draggingAvatar) {
+      document.addEventListener('mousemove', handleAvatarMouseMove);
+      document.addEventListener('mouseup', handleAvatarMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleAvatarMouseMove);
+        document.removeEventListener('mouseup', handleAvatarMouseUp);
+      };
+    }
+  }, [draggingAvatar, avatarDragStart]);
+
   return (
     <div className="character-relationship">
       <div className="character-relationship-header">
@@ -341,20 +564,48 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
             <div className="rpg-avatar-section">
               <div className="rpg-avatar-container">
                 {newCharacter.image ? (
-                  <div className="rpg-avatar-preview">
-                    <img src={newCharacter.image} alt="角色頭像" />
-                    <div className="rpg-avatar-overlay">
-                      <label className="rpg-avatar-upload-btn">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          style={{ display: 'none' }}
-                        />
-                        更換頭像
-                      </label>
+                  <>
+                    <div 
+                      ref={(el) => avatarPreviewRef.current.new = el}
+                      className="rpg-avatar-preview"
+                      onMouseDown={(e) => handleAvatarMouseDown(e, 'new')}
+                      onWheel={(e) => handleAvatarWheel(e, 'new')}
+                      style={{ cursor: draggingAvatar === 'new' ? 'grabbing' : 'grab' }}
+                    >
+                      <img 
+                        src={newCharacter.image} 
+                        alt="角色頭像"
+                        draggable={false}
+                        style={{
+                          transform: newCharacter.imagePosition 
+                            ? `translate(calc(-50% + ${(newCharacter.imagePosition.x || 0) * 0.5}px), calc(-50% + ${(newCharacter.imagePosition.y || 0) * 0.5}px)) scale(${newCharacter.imagePosition.scale || 1})`
+                            : 'translate(-50%, -50%)',
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      />
+                      {newCharacter.uploading && (
+                        <div className="rpg-avatar-uploading">
+                          <div className="rpg-uploading-spinner"></div>
+                          <span>上傳中...</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                    <label className="rpg-avatar-change-btn" title="更換頭像">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        style={{ display: 'none' }}
+                      />
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span>更換圖片</span>
+                    </label>
+                  </>
                 ) : (
                   <label className="rpg-avatar-placeholder">
                     <input
@@ -439,7 +690,7 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
           <div className="rpg-form-actions">
             <button className="rpg-cancel-btn" onClick={() => {
               setShowAddForm(false);
-              setNewCharacter({ name: '', personality: '', image: null });
+              setNewCharacter({ name: '', personality: '', image: null, uploading: false });
             }}>
               取消
             </button>
@@ -456,7 +707,7 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
             <h3>編輯角色</h3>
             <button className="rpg-form-close" onClick={() => {
               setEditingCharacter(null);
-              setEditCharacterForm({ name: '', personality: '', image: null });
+              setEditCharacterForm({ name: '', personality: '', image: null, uploading: false });
             }}>×</button>
           </div>
           
@@ -464,20 +715,48 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
             <div className="rpg-avatar-section">
               <div className="rpg-avatar-container">
                 {editCharacterForm.image ? (
-                  <div className="rpg-avatar-preview">
-                    <img src={editCharacterForm.image} alt="角色頭像" />
-                    <div className="rpg-avatar-overlay">
-                      <label className="rpg-avatar-upload-btn">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleImageUpload(e, true)}
-                          style={{ display: 'none' }}
-                        />
-                        更換頭像
-                      </label>
+                  <>
+                    <div 
+                      ref={(el) => avatarPreviewRef.current.edit = el}
+                      className="rpg-avatar-preview"
+                      onMouseDown={(e) => handleAvatarMouseDown(e, 'edit')}
+                      onWheel={(e) => handleAvatarWheel(e, 'edit')}
+                      style={{ cursor: draggingAvatar === 'edit' ? 'grabbing' : 'grab' }}
+                    >
+                      <img 
+                        src={editCharacterForm.image} 
+                        alt="角色頭像"
+                        draggable={false}
+                        style={{
+                          transform: editCharacterForm.imagePosition 
+                            ? `translate(calc(-50% + ${(editCharacterForm.imagePosition.x || 0) * 0.5}px), calc(-50% + ${(editCharacterForm.imagePosition.y || 0) * 0.5}px)) scale(${editCharacterForm.imagePosition.scale || 1})`
+                            : 'translate(-50%, -50%)',
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      />
+                      {editCharacterForm.uploading && (
+                        <div className="rpg-avatar-uploading">
+                          <div className="rpg-uploading-spinner"></div>
+                          <span>上傳中...</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                    <label className="rpg-avatar-change-btn" title="更換頭像">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, true)}
+                        style={{ display: 'none' }}
+                      />
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <polyline points="17 8 12 3 7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span>更換圖片</span>
+                    </label>
+                  </>
                 ) : (
                   <label className="rpg-avatar-placeholder">
                     <input
@@ -562,7 +841,7 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
           <div className="rpg-form-actions">
             <button className="rpg-cancel-btn" onClick={() => {
               setEditingCharacter(null);
-              setEditCharacterForm({ name: '', personality: '', image: null });
+              setEditCharacterForm({ name: '', personality: '', image: null, uploading: false });
             }}>
               取消
             </button>
@@ -697,15 +976,6 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
               onMouseDown={(e) => handleMouseDown(e, char.id)}
               className={`character-node ${draggingId === char.id ? 'dragging' : ''} ${connectingFrom === char.id ? 'connecting' : ''}`}
             >
-              <circle
-                cx="0"
-                cy="0"
-                r="50"
-                fill="#ffffff"
-                stroke={connectingFrom === char.id ? "#6366f1" : "#e5e7eb"}
-                strokeWidth={connectingFrom === char.id ? "3" : "2"}
-                style={{ cursor: connectingFrom ? 'crosshair' : 'move' }}
-              />
               <g 
                 clipPath="url(#circleClip)" 
                 transform="translate(0, 0)"
@@ -713,15 +983,17 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
                 style={{ cursor: 'pointer' }}
               >
                 {char.image ? (
-                  <image
-                    href={char.image}
-                    x="-45"
-                    y="-45"
-                    width="90"
-                    height="90"
-                    preserveAspectRatio="xMidYMid slice"
-                    style={{ pointerEvents: 'auto' }}
-                  />
+                  <g transform={`translate(${char.imagePosition ? (char.imagePosition.x || 0) * 0.5 : 0}, ${char.imagePosition ? (char.imagePosition.y || 0) * 0.5 : 0})`}>
+                    <image
+                      href={char.image}
+                      x={char.imagePosition ? -45 * (char.imagePosition.scale || 1) : -45}
+                      y={char.imagePosition ? -45 * (char.imagePosition.scale || 1) : -45}
+                      width={char.imagePosition ? (90 * (char.imagePosition.scale || 1)) : 90}
+                      height={char.imagePosition ? (90 * (char.imagePosition.scale || 1)) : 90}
+                      preserveAspectRatio="xMidYMid slice"
+                      style={{ pointerEvents: 'auto' }}
+                    />
+                  </g>
                 ) : (
                   <circle
                     cx="0"
@@ -732,6 +1004,15 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
                   />
                 )}
               </g>
+              <circle
+                cx="0"
+                cy="0"
+                r="50"
+                fill="none"
+                stroke={connectingFrom === char.id ? "#6366f1" : "#e5e7eb"}
+                strokeWidth={connectingFrom === char.id ? "3" : "2"}
+                style={{ cursor: connectingFrom ? 'crosshair' : 'move', pointerEvents: 'none' }}
+              />
               <text
                 x="0"
                 y="65"
@@ -799,6 +1080,36 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
         <div className="connection-selected-hint">
           已選中連線，按 Delete 鍵可刪除此關係
         </div>
+      )}
+
+      {/* 圖片位置編輯器 */}
+      {showImageEditor && tempImageSrc && (
+        <ImagePositionEditor
+          imageSrc={tempImageSrc}
+          initialPosition={
+            editingImageFor === 'new' 
+              ? newCharacter.imagePosition 
+              : editingImageFor === 'edit' 
+                ? editCharacterForm.imagePosition 
+                : null
+          }
+          onSave={(position) => {
+            console.log('✅ 圖片位置已調整:', position);
+            if (editingImageFor === 'new') {
+              setNewCharacter(prev => ({ ...prev, imagePosition: position }));
+            } else if (editingImageFor === 'edit') {
+              setEditCharacterForm(prev => ({ ...prev, imagePosition: position }));
+            }
+            setShowImageEditor(false);
+            setTempImageSrc(null);
+            setEditingImageFor(null);
+          }}
+          onCancel={() => {
+            setShowImageEditor(false);
+            setTempImageSrc(null);
+            setEditingImageFor(null);
+          }}
+        />
       )}
 
       <div className="character-relationship-help">

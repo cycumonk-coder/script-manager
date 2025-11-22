@@ -199,10 +199,12 @@ export async function writeData(sheetName, range, values) {
   }
 }
 
-// 保存完整專案資料
+// 保存完整專案資料（即時儲存）
 export async function saveProjectData(data) {
   try {
     const sheetName = 'ScriptData';
+    
+    console.log('💾 [Google Sheets] 開始保存專案資料...');
     
     // 將資料轉換為二維陣列
     const rows = [
@@ -216,9 +218,10 @@ export async function saveProjectData(data) {
     ];
 
     await writeData(sheetName, 'A1:B10', rows);
+    console.log('✅ [Google Sheets] 專案資料保存成功');
     return true;
   } catch (error) {
-    console.error('保存專案資料失敗:', error);
+    console.error('❌ [Google Sheets] 保存專案資料失敗:', error);
     throw error;
   }
 }
@@ -275,8 +278,8 @@ export async function loadProjectData() {
   }
 }
 
-// 創建新的 Google Sheet（如果用戶還沒有）
-export async function createNewSpreadsheet(title = '劇本管理平台') {
+// 創建 Google Drive 資料夾
+export async function createFolder(folderName = '劇本管理平台') {
   const token = getAccessToken();
   
   if (!token) {
@@ -284,7 +287,95 @@ export async function createNewSpreadsheet(title = '劇本管理平台') {
   }
 
   try {
-    // 使用 Google Drive API 創建新的 Google Sheet
+    // 使用 Google Drive API 創建資料夾
+    const response = await fetch(
+      'https://www.googleapis.com/drive/v3/files?access_token=' + token,
+      {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: folderName,
+          mimeType: 'application/vnd.google-apps.folder'
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('創建資料夾錯誤詳情:', error);
+      throw new Error(error.error?.message || '創建資料夾失敗');
+    }
+
+    const result = await response.json();
+    const folderId = result.id;
+    
+    if (!folderId) {
+      throw new Error('創建成功但未返回資料夾 ID');
+    }
+    
+    console.log('✅ 成功創建資料夾:', folderName, 'ID:', folderId);
+    return folderId;
+  } catch (error) {
+    console.error('創建資料夾錯誤:', error);
+    throw error;
+  }
+}
+
+// 檢查資料夾是否存在，如果不存在則創建
+export async function ensureFolder(folderName = '劇本管理平台') {
+  const token = getAccessToken();
+  
+  if (!token) {
+    throw new Error('未設置 Google Sheets 認證信息');
+  }
+
+  try {
+    // 先搜尋是否已存在同名資料夾
+    const searchQuery = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const searchResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&access_token=${token}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    if (searchResponse.ok) {
+      const searchResult = await searchResponse.json();
+      if (searchResult.files && searchResult.files.length > 0) {
+        // 找到現有資料夾，返回第一個
+        console.log('✅ 找到現有資料夾:', folderName, 'ID:', searchResult.files[0].id);
+        return searchResult.files[0].id;
+      }
+    }
+
+    // 如果不存在，創建新資料夾
+    return await createFolder(folderName);
+  } catch (error) {
+    console.error('確保資料夾存在錯誤:', error);
+    // 如果搜尋失敗，直接創建
+    return await createFolder(folderName);
+  }
+}
+
+// 創建新的 Google Sheet（如果用戶還沒有），並放在指定的資料夾中
+export async function createNewSpreadsheet(title = '劇本管理平台', folderName = '劇本管理平台') {
+  const token = getAccessToken();
+  
+  if (!token) {
+    throw new Error('未設置 Google Sheets 認證信息');
+  }
+
+  try {
+    // 確保資料夾存在
+    console.log('📁 檢查並創建資料夾:', folderName);
+    const folderId = await ensureFolder(folderName);
+    
+    // 使用 Google Drive API 創建新的 Google Sheet，並放在資料夾中
     const response = await fetch(
       'https://www.googleapis.com/drive/v3/files?access_token=' + token,
       {
@@ -295,7 +386,8 @@ export async function createNewSpreadsheet(title = '劇本管理平台') {
         },
         body: JSON.stringify({
           name: title,
-          mimeType: 'application/vnd.google-apps.spreadsheet'
+          mimeType: 'application/vnd.google-apps.spreadsheet',
+          parents: [folderId] // 將 Sheet 放在資料夾中
         })
       }
     );
@@ -313,11 +405,236 @@ export async function createNewSpreadsheet(title = '劇本管理平台') {
       throw new Error('創建成功但未返回 Sheet ID');
     }
     
+    console.log('✅ 成功創建 Google Sheet:', title, 'ID:', sheetId, '資料夾:', folderName);
     setSpreadsheetId(sheetId);
     return sheetId;
   } catch (error) {
     console.error('創建 Google Sheet 錯誤:', error);
     throw error;
   }
+}
+
+// 上傳圖片到 Google Drive 的 photo 資料夾
+export async function uploadImageToDrive(file, folderName = 'photo', parentFolderName = '劇本管理平台') {
+  const token = getAccessToken();
+  
+  if (!token) {
+    throw new Error('未設置 Google Sheets 認證信息');
+  }
+
+  try {
+    // 先確保父資料夾存在
+    console.log('📁 檢查並創建父資料夾:', parentFolderName);
+    const parentFolderId = await ensureFolder(parentFolderName);
+    
+    // 在父資料夾中查找或創建 photo 資料夾
+    const photoFolderId = await ensureFolderInParent(folderName, parentFolderId);
+    
+    // 壓縮圖片
+    const compressedFile = await compressImageFile(file, 800, 800, 0.85);
+    
+    // 創建 FormData 來上傳圖片
+    const formData = new FormData();
+    const metadata = {
+      name: `${Date.now()}_${file.name}`,
+      parents: [photoFolderId]
+    };
+    
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    formData.append('file', compressedFile);
+    
+    // 上傳到 Google Drive
+    const response = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,webContentLink&access_token=' + token,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('上傳圖片錯誤詳情:', error);
+      throw new Error(error.error?.message || '上傳圖片失敗');
+    }
+
+    const result = await response.json();
+    
+    // 設置文件為公開可讀（用於顯示）
+    if (result.id) {
+      try {
+        await setFilePublic(result.id);
+      } catch (err) {
+        console.warn('設置文件為公開失敗，但不影響使用:', err);
+      }
+    }
+    
+    // 返回圖片的共享連結（使用 Google Drive 的圖片預覽 URL）
+    // 這個 URL 可以直接在 <img> 標籤中使用
+    const imageUrl = `https://drive.google.com/uc?export=view&id=${result.id}`;
+    
+    console.log('✅ 圖片上傳成功:', result.id);
+    console.log('📷 圖片 URL:', imageUrl);
+    console.log('🔗 圖片查看連結:', result.webViewLink);
+    
+    return {
+      fileId: result.id,
+      url: imageUrl,  // 用於 <img src>
+      webViewLink: result.webViewLink  // 用於在新分頁中查看
+    };
+  } catch (error) {
+    console.error('上傳圖片錯誤:', error);
+    throw error;
+  }
+}
+
+// 在指定父資料夾中查找或創建資料夾
+async function ensureFolderInParent(folderName, parentFolderId) {
+  const token = getAccessToken();
+  
+  if (!token) {
+    throw new Error('未設置 Google Sheets 認證信息');
+  }
+
+  try {
+    // 搜尋是否已存在同名資料夾在指定父資料夾中
+    const searchQuery = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`;
+    const searchResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQuery)}&access_token=${token}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    if (searchResponse.ok) {
+      const searchResult = await searchResponse.json();
+      if (searchResult.files && searchResult.files.length > 0) {
+        // 找到現有資料夾，返回第一個
+        console.log('✅ 找到現有資料夾:', folderName, 'ID:', searchResult.files[0].id);
+        return searchResult.files[0].id;
+      }
+    }
+
+    // 如果不存在，創建新資料夾在指定父資料夾中
+    const response = await fetch(
+      'https://www.googleapis.com/drive/v3/files?access_token=' + token,
+      {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: folderName,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [parentFolderId]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || '創建資料夾失敗');
+    }
+
+    const result = await response.json();
+    console.log('✅ 成功創建資料夾:', folderName, 'ID:', result.id);
+    return result.id;
+  } catch (error) {
+    console.error('確保資料夾存在錯誤:', error);
+    throw error;
+  }
+}
+
+// 設置文件為公開可讀
+async function setFilePublic(fileId) {
+  const token = getAccessToken();
+  
+  if (!token) {
+    throw new Error('未設置 Google Sheets 認證信息');
+  }
+
+  try {
+    // 創建公開讀取權限
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?access_token=${token}`,
+      {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          role: 'reader',
+          type: 'anyone'
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      // 如果權限已存在，不視為錯誤
+      if (error.error?.code !== 409) {
+        throw new Error(error.error?.message || '設置文件權限失敗');
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('設置文件權限錯誤:', error);
+    throw error;
+  }
+}
+
+// 壓縮圖片文件（返回 Blob）
+function compressImageFile(file, maxWidth = 800, maxHeight = 800, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // 計算新尺寸
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+        
+        // 創建 canvas 並繪製壓縮後的圖片
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 轉換為 Blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('圖片壓縮失敗'));
+          }
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 

@@ -133,6 +133,113 @@ const SceneGrouping = ({ scenes, onSelectScene }) => {
     return a[0].localeCompare(b[0], 'zh-TW');
   });
 
+  // 匯出篩選後的場景資料
+  const handleExportFilteredScenes = () => {
+    if (sortedGroups.length === 0) {
+      alert('目前沒有可匯出的場景資料');
+      return;
+    }
+
+    // 收集所有篩選後的場景
+    const allFilteredScenes = [];
+    sortedGroups.forEach(([location, sceneList]) => {
+      sceneList.forEach(scene => {
+        allFilteredScenes.push({
+          ...scene,
+          groupLocation: location
+        });
+      });
+    });
+
+    // 按場次編號排序
+    allFilteredScenes.sort((a, b) => (a.number || 0) - (b.number || 0));
+
+    // 準備匯出資料
+    const exportData = {
+      searchTerm: searchTerm,
+      exportDate: new Date().toISOString(),
+      totalScenes: allFilteredScenes.length,
+      groups: sortedGroups.map(([location, sceneList]) => ({
+        location: location,
+        sceneCount: sceneList.length,
+        scenes: sceneList.sort((a, b) => (a.number || 0) - (b.number || 0))
+      })),
+      allScenes: allFilteredScenes
+    };
+
+    // 匯出為 JSON 格式
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
+      type: 'application/json;charset=utf-8' 
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fileName = `場景統整_${searchTerm}_${new Date().toISOString().split('T')[0]}.json`;
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // 匯出為文字格式
+  const handleExportAsText = () => {
+    if (sortedGroups.length === 0) {
+      alert('目前沒有可匯出的場景資料');
+      return;
+    }
+
+    let text = `場景統整結果\n`;
+    text += `搜尋關鍵字: ${searchTerm}\n`;
+    text += `匯出日期: ${new Date().toLocaleString('zh-TW')}\n`;
+    text += `總場景數: ${sortedGroups.reduce((sum, [, scenes]) => sum + scenes.length, 0)}\n`;
+    text += `${'='.repeat(50)}\n\n`;
+
+    sortedGroups.forEach(([location, sceneList]) => {
+      text += `地點: ${location} (${sceneList.length} 個場景)\n`;
+      text += `${'-'.repeat(50)}\n`;
+      
+      // 按場次編號排序
+      const sortedScenes = [...sceneList].sort((a, b) => (a.number || 0) - (b.number || 0));
+      
+      sortedScenes.forEach((scene, index) => {
+        text += `\n場次 ${scene.number}`;
+        if (scene.title) {
+          text += ` - ${scene.title}`;
+        }
+        text += `\n`;
+        
+        if (scene.location) {
+          text += `地點: ${scene.location}\n`;
+        }
+        
+        if (scene.content) {
+          text += `內容:\n${scene.content}\n`;
+        }
+        
+        if (index < sortedScenes.length - 1) {
+          text += `\n${'-'.repeat(30)}\n`;
+        }
+      });
+      
+      text += `\n\n`;
+    });
+
+    // 匯出為文字檔
+    const blob = new Blob([text], { 
+      type: 'text/plain;charset=utf-8' 
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fileName = `場景統整_${searchTerm}_${new Date().toISOString().split('T')[0]}.txt`;
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleSubmitNewScene = () => {
     if (!newScene.beatId) {
       alert('請選擇大綱');
@@ -173,6 +280,34 @@ const SceneGrouping = ({ scenes, onSelectScene }) => {
             onCompositionStart={handleSearchCompositionStart}
             onCompositionEnd={handleSearchCompositionEnd}
           />
+          {sortedGroups.length > 0 && (
+            <div className="export-buttons">
+              <button 
+                className="export-btn export-json-btn"
+                onClick={handleExportFilteredScenes}
+                title="匯出為 JSON 格式"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                匯出 JSON
+              </button>
+              <button 
+                className="export-btn export-text-btn"
+                onClick={handleExportAsText}
+                title="匯出為文字格式"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                匯出文字
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -93,10 +93,10 @@ const ScriptManager = () => {
         debugLocalStorage.checkUsage();
 
         // 從 localStorage 載入（作為備份或首次使用）
-        const savedScriptData = localStorage.getItem('scriptData');
-        const savedOutline = localStorage.getItem('scriptOutline');
-        const savedScenes = localStorage.getItem('scriptScenes');
-        const savedCharacters = localStorage.getItem('characters');
+    const savedScriptData = localStorage.getItem('scriptData');
+    const savedOutline = localStorage.getItem('scriptOutline');
+    const savedScenes = localStorage.getItem('scriptScenes');
+    const savedCharacters = localStorage.getItem('characters');
         const savedConnections = localStorage.getItem('characterConnections');
         
         console.log('🔵 [ScriptManager] 開始載入人物關係圖資料...');
@@ -264,7 +264,7 @@ const ScriptManager = () => {
     }
     outlineTimeoutRef.current = setTimeout(() => {
       saveToCloud({ outline });
-    }, 200); // 縮短到 200ms
+    }, 100); // 即時儲存：100ms
     
     return () => {
       if (outlineTimeoutRef.current) {
@@ -308,7 +308,7 @@ const ScriptManager = () => {
     }
     scenesTimeoutRef.current = setTimeout(() => {
       saveToCloud({ scenes });
-    }, 200); // 縮短到 200ms
+    }, 100); // 即時儲存：100ms
     
     return () => {
       if (scenesTimeoutRef.current) {
@@ -368,7 +368,8 @@ const ScriptManager = () => {
       console.error('❌ [ScriptManager] 保存角色資料失敗:', err);
       // 如果 localStorage 空間不足，提示用戶
       if (err.name === 'QuotaExceededError') {
-        alert('儲存空間不足，請清除瀏覽器資料或刪除部分角色');
+        const message = `儲存空間不足（localStorage 已滿，通常約 5-10MB）。\n\n可能原因：\n• 角色圖片佔用太多空間\n• 場次內容過多\n\n建議解決方法：\n1. 刪除部分角色的圖片（圖片會佔用大量空間）\n2. 清除瀏覽器快取和網站資料\n3. 使用 Google Sheets 雲端同步功能來儲存資料\n4. 匯出資料後清除 localStorage 再重新匯入`;
+        alert(message);
       }
     }
     
@@ -378,7 +379,7 @@ const ScriptManager = () => {
     }
     charactersTimeoutRef.current = setTimeout(() => {
       saveToCloud({ characters });
-    }, 200); // 縮短到 200ms
+    }, 100); // 即時儲存：100ms
     
     return () => {
       if (charactersTimeoutRef.current) {
@@ -410,7 +411,7 @@ const ScriptManager = () => {
     }
     connectionsTimeoutRef.current = setTimeout(() => {
       saveToCloud({ connections: characterConnections });
-    }, 200);
+    }, 100); // 即時儲存：100ms
     
     return () => {
       if (connectionsTimeoutRef.current) {
