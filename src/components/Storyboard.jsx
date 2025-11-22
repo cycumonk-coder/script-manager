@@ -202,19 +202,59 @@ const Storyboard = ({ scenes, onUpdateScene }) => {
               console.log('✅ [Storyboard] 分鏡圖上傳到 Google Drive 成功 (photo/storyboard):', uploadResult.url);
               
               // 更新為 Google Drive URL
-              const finalImageUrl = uploadResult.url;
+              const finalImageUrl = uploadResult.url || uploadResult.directUrl;
               
-              setStoryboardItems(prev => {
-                const updated = prev.map(item => 
-                  item.id === itemId 
-                    ? { ...item, image: finalImageUrl, uploading: false }
-                    : { ...item, uploading: false }
-                );
+              // 驗證圖片 URL 是否可訪問（簡單驗證，超時後假設有效）
+              const validateImageUrl = (url) => {
+                return new Promise((resolve) => {
+                  const testImage = new Image();
+                  let resolved = false;
+                  
+                  const resolveOnce = (result) => {
+                    if (!resolved) {
+                      resolved = true;
+                      resolve(result);
+                    }
+                  };
+                  
+                  testImage.onload = () => {
+                    console.log('✅ [Storyboard] 圖片 URL 驗證成功:', url);
+                    resolveOnce(true);
+                  };
+                  
+                  testImage.onerror = () => {
+                    console.warn('⚠️ [Storyboard] 圖片 URL 無法訪問，將使用本地壓縮圖片:', url);
+                    resolveOnce(false);
+                  };
+                  
+                  // 設置超時（3秒後假設 URL 有效，因為有時 CORS 會阻止驗證）
+                  setTimeout(() => {
+                    console.log('⏱️ [Storyboard] 圖片 URL 驗證超時，假設有效:', url);
+                    resolveOnce(true);
+                  }, 3000);
+                  
+                  testImage.src = url;
+                });
+              };
+              
+              const isValidUrl = await validateImageUrl(finalImageUrl);
+              
+              // 先獲取當前 item 以獲取 sceneId
+              const currentItem = storyboardItems.find(i => i.id === itemId);
+              
+              if (isValidUrl) {
+                // URL 有效，使用 Google Drive URL
+                setStoryboardItems(prev => {
+                  return prev.map(item => 
+                    item.id === itemId 
+                      ? { ...item, image: finalImageUrl, uploading: false }
+                      : item
+                  );
+                });
                 
                 // 更新場景資料
-                const item = updated.find(i => i.id === itemId);
-                if (item && onUpdateScene && scenes) {
-                  const scene = scenes.find(s => s.id === item.sceneId);
+                if (onUpdateScene && scenes && currentItem) {
+                  const scene = scenes.find(s => s.id === currentItem.sceneId);
                   if (scene) {
                     onUpdateScene({
                       ...scene,
@@ -222,17 +262,36 @@ const Storyboard = ({ scenes, onUpdateScene }) => {
                     });
                   }
                 }
+              } else {
+                // URL 無效，保持使用本地 base64 圖片（必須保留 imageData）
+                console.log('🔄 [Storyboard] 圖片 URL 無效，保持使用本地壓縮圖片');
+                setStoryboardItems(prev => {
+                  return prev.map(item => 
+                    item.id === itemId 
+                      ? { ...item, image: imageData, uploading: false }  // 保留圖片數據
+                      : item
+                  );
+                });
                 
-                return updated;
-              });
+                // 更新場景資料（使用本地圖片）
+                if (onUpdateScene && scenes && currentItem) {
+                  const scene = scenes.find(s => s.id === currentItem.sceneId);
+                  if (scene) {
+                    onUpdateScene({
+                      ...scene,
+                      storyboardImage: imageData  // 使用本地 base64 圖片
+                    });
+                  }
+                }
+              }
             } catch (uploadError) {
               console.error('❌ [Storyboard] 上傳到 Google Drive 失敗，使用本地圖片:', uploadError);
-              // 如果上傳失敗，繼續使用本地 base64 圖片
+              // 如果上傳失敗，繼續使用本地 base64 圖片（必須保留 imageData）
               setStoryboardItems(prev => {
                 const updated = prev.map(item => 
                   item.id === itemId 
-                    ? { ...item, uploading: false }
-                    : { ...item, uploading: false }
+                    ? { ...item, image: imageData, uploading: false }  // 保留圖片數據
+                    : item
                 );
                 
                 // 更新場景資料（使用本地圖片）

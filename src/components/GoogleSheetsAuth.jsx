@@ -89,9 +89,12 @@ const GoogleSheetsAuth = ({ onAuthChange, onSpreadsheetReady }) => {
             let errorMessage = '授權失敗: ' + tokenResponse.error;
             
             // 提供更具體的錯誤訊息
-            if (tokenResponse.error === 'invalid_client') {
+            if (tokenResponse.error === 'deleted_client') {
               const currentClientId = clientId || localStorage.getItem('google_client_id') || '未設置';
-              errorMessage = `OAuth 客戶端未找到！\n\n當前使用的 Client ID：${currentClientId}\n\n請確認以下項目：\n\n1. 在 Google Cloud Console (https://console.cloud.google.com/apis/credentials) 中確認 Client ID 是否存在\n2. 確認 Client ID 完整且正確（應該包含 .apps.googleusercontent.com）\n3. 確認應用程式類型為「網頁應用程式」\n4. ⚠️ 最重要：在「已授權的 JavaScript 來源」中添加：http://localhost:3001（沒有尾隨斜線）\n5. 確認在「OAuth 同意畫面」中添加了您的 Google 帳號為測試使用者\n6. 如果修改了設定，請等待 1-2 分鐘後再嘗試\n\n如果問題持續，請嘗試刪除並重新創建 OAuth 客戶端。`;
+              errorMessage = `❌ OAuth 客戶端已被刪除！\n\n當前使用的 Client ID：${currentClientId}\n\n🔧 解決方案：\n\n1. 前往 Google Cloud Console (https://console.cloud.google.com/apis/credentials)\n2. 確認該 Client ID 是否已被刪除\n3. 如果已刪除，請創建一個新的 OAuth 2.0 客戶端 ID：\n   - 點擊「建立憑證」>「OAuth 用戶端 ID」\n   - 應用程式類型選擇「網頁應用程式」\n   - 在「已授權的 JavaScript 來源」中添加以下網址：\n     • ${window.location.origin}\n     • ${window.location.protocol === 'https:' ? 'https' : 'http'}://localhost:3001\n4. 複製新的 Client ID 並在下方輸入框中更新\n5. 點擊「設定」按鈕保存新的 Client ID\n\n⚠️ 注意：如果您在 Vercel 上部署，請確保在「已授權的 JavaScript 來源」中添加您的 Vercel 網址！`;
+            } else if (tokenResponse.error === 'invalid_client') {
+              const currentClientId = clientId || localStorage.getItem('google_client_id') || '未設置';
+              errorMessage = `OAuth 客戶端未找到！\n\n當前使用的 Client ID：${currentClientId}\n\n請確認以下項目：\n\n1. 在 Google Cloud Console (https://console.cloud.google.com/apis/credentials) 中確認 Client ID 是否存在\n2. 確認 Client ID 完整且正確（應該包含 .apps.googleusercontent.com）\n3. 確認應用程式類型為「網頁應用程式」\n4. ⚠️ 最重要：在「已授權的 JavaScript 來源」中添加：\n   • ${window.location.origin}\n   • ${window.location.protocol === 'https:' ? 'https' : 'http'}://localhost:3001\n5. 確認在「OAuth 同意畫面」中添加了您的 Google 帳號為測試使用者\n6. 如果修改了設定，請等待 1-2 分鐘後再嘗試\n\n如果問題持續，請嘗試刪除並重新創建 OAuth 客戶端。`;
             } else if (tokenResponse.error === 'invalid_request') {
               const currentClientId = clientId || localStorage.getItem('google_client_id') || '未設置';
               errorMessage = `OAuth 請求無效！\n\n當前使用的 Client ID：${currentClientId}\n\n可能的原因：\n\n1. ⚠️ 在 Google Cloud Console 的「已授權的 JavaScript 來源」中，必須添加：\n   - http://localhost:3001（沒有尾隨斜線）\n   - 如果使用其他端口，請添加對應的 URL\n\n2. 確認 Client ID 格式正確（應該包含 .apps.googleusercontent.com）\n\n3. 確認應用程式類型為「網頁應用程式」\n\n4. 確認已啟用 Google Sheets API 和 Google Drive API\n\n5. 在 OAuth 同意畫面中添加了您的 Google 帳號為測試使用者\n\n6. 清除瀏覽器快取並重新整理頁面後再試\n\n7. 如果問題持續，請嘗試刪除並重新創建 OAuth 客戶端`;
@@ -361,17 +364,28 @@ const GoogleSheetsAuth = ({ onAuthChange, onSpreadsheetReady }) => {
                   <ul>
                     <li>應用程式類型：<strong>網頁應用程式</strong></li>
                     <li>名稱：劇本管理平台（或自訂）</li>
-                    <li>已授權的 JavaScript 來源：<strong>http://localhost:3001</strong></li>
+                    <li>已授權的 JavaScript 來源：
+                      <ul>
+                        <li><strong>http://localhost:3001</strong>（本地開發）</li>
+                        <li><strong>https://{window.location.host}</strong>（當前網址，如 Vercel 部署）</li>
+                      </ul>
+                    </li>
                   </ul>
                 </li>
                 <li>複製 Client ID（格式：xxxxx.apps.googleusercontent.com）並貼上</li>
               </ol>
-              <p className="important-note">⚠️ 重要：如果遇到「invalid_client」錯誤，請確認：</p>
+              <p className="important-note">⚠️ 重要：如果遇到「invalid_client」或「deleted_client」錯誤，請確認：</p>
               <ul>
                 <li>Client ID 完整且正確（包含 .apps.googleusercontent.com）</li>
-                <li>在「已授權的 JavaScript 來源」中添加了 http://localhost:3001</li>
+                <li>在「已授權的 JavaScript 來源」中添加了以下網址：
+                  <ul>
+                    <li><strong>http://localhost:3001</strong>（本地開發）</li>
+                    <li><strong>https://{window.location.host}</strong>（當前網址，如 Vercel 部署）</li>
+                  </ul>
+                </li>
                 <li>應用程式類型為「網頁應用程式」而非其他類型</li>
                 <li>在 OAuth 同意畫面中添加了您的帳號為測試使用者</li>
+                <li>⚠️ <strong>deleted_client</strong> 錯誤表示 OAuth 客戶端已被刪除，請創建新的客戶端 ID</li>
               </ul>
             </div>
           </div>
