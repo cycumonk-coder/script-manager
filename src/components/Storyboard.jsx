@@ -908,6 +908,19 @@ const Storyboard = ({ scenes, onUpdateScene }) => {
                           <button 
                             className="remove-image-btn"
                             onClick={() => {
+                              // 同步更新場景資料，清除 storyboardImage（先更新場景資料）
+                              if (onUpdateScene && scenes && item.sceneId) {
+                                const scene = scenes.find(s => s.id === item.sceneId);
+                                if (scene) {
+                                  onUpdateScene({
+                                    ...scene,
+                                    storyboardImage: null  // 清除場景中的分鏡圖
+                                  });
+                                  console.log('🗑️ [Storyboard] 已刪除分鏡圖並同步更新場景資料，場景 ID:', scene.id);
+                                }
+                              }
+                              
+                              // 更新分鏡圖項目狀態（即時反映在 UI）
                               setStoryboardItems(prev => 
                                 prev.map(i => i.id === item.id ? { ...i, image: null } : i)
                               );
