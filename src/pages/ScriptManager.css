@@ -75,6 +75,96 @@
   margin-top: 32px;
 }
 
+/* Tab 樣式 */
+.tabs-container {
+  margin-top: 32px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tabs-nav {
+  display: flex;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tabs-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 16px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  position: relative;
+}
+
+.tab-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.tab-btn.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+  background: #ffffff;
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #6366f1;
+}
+
+.tabs-content {
+  padding: 0;
+  min-height: 400px;
+}
+
+.tabs-content > * {
+  padding: 32px;
+  border-radius: 0;
+  margin: 0;
+  box-shadow: none;
+  border: none;
+}
+
+@media (max-width: 768px) {
+  .tabs-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    min-width: 100px;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .tabs-content > * {
+    padding: 20px;
+  }
+}
+
 @media (max-width: 768px) {
   .script-manager {
     padding: 24px 16px;

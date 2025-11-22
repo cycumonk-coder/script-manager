@@ -6,6 +6,7 @@ import SceneEditor from '../components/SceneEditor';
 import ImportExport from '../components/ImportExport';
 import CharacterRelationship from '../components/CharacterRelationship';
 import SceneGrouping from '../components/SceneGrouping';
+import Storyboard from '../components/Storyboard';
 import Settings from '../components/Settings';
 import { 
   isAuthenticated, 
@@ -33,6 +34,7 @@ const ScriptManager = () => {
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false);
   const [googleSheetReady, setGoogleSheetReady] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState('project');
   const saveTimeoutRef = useRef(null);
   const isInitialLoadRef = useRef(true);
   const scriptDataRef = useRef(scriptData);
@@ -444,6 +446,43 @@ const ScriptManager = () => {
     setOutline(newOutline);
   };
 
+  // 清空所有專案內容
+  const handleClearProject = () => {
+    // 清空所有 state
+    setScriptData({
+      deadline: '',
+      totalScenes: 0,
+      completedScenes: 0,
+      title: '',
+      coreIdea: '',
+    });
+    setOutline({});
+    setScenes([]);
+    setSelectedScene(null);
+    setCharacters([]);
+    setCharacterConnections([]);
+    
+    // 清空 localStorage
+    try {
+      localStorage.removeItem('scriptData');
+      localStorage.removeItem('scriptOutline');
+      localStorage.removeItem('scriptScenes');
+      localStorage.removeItem('characters');
+      localStorage.removeItem('characterConnections');
+      console.log('✅ 已清空所有 localStorage 資料');
+    } catch (err) {
+      console.error('清空 localStorage 失敗:', err);
+    }
+    
+    // 提示用戶 Google Sheets 的資料需要手動清除
+    if (googleAuthEnabled && googleSheetReady) {
+      console.log('⚠️ Google Sheets 中的資料需要手動清除');
+      setTimeout(() => {
+        alert('提示：Google Sheets 中的資料未自動清除，如需清空雲端資料，請手動操作。');
+      }, 500);
+    }
+  };
+
   const handleSelectScene = (scene) => {
     setSelectedScene(scene);
     setShowEditor(true);
@@ -518,113 +557,173 @@ const ScriptManager = () => {
       )}
 
       <div className="script-manager-content">
-        <ProjectInfo
-          scriptData={scriptData}
-          onUpdateScriptData={handleUpdateScriptData}
-        />
-
+        {/* Dashboard 在最上面 */}
         <ScriptDashboard
           scriptData={scriptData}
           onUpdateScriptData={handleUpdateScriptData}
         />
 
-        <ScriptOutline 
-          outline={outline} 
-          onUpdateOutline={handleUpdateOutline}
-          scenes={scenes}
-          onSelectScene={handleSelectScene}
-          onUpdateScene={handleUpdateScene}
-          onDeleteScene={handleDeleteScene}
-          onAddScene={(newScene) => {
-            // 新增場次並立即保存
-            setScenes((prev) => {
-              const updated = [...prev, newScene];
-              // 立即保存到 localStorage
-              try {
-                localStorage.setItem('scriptScenes', JSON.stringify(updated));
-                console.log('✅ 新增場次已保存到 localStorage');
-              } catch (err) {
-                console.error('保存場次到 localStorage 失敗:', err);
-              }
-              // 更新已完成場次數（實際新增的場次數量），總場次數保持用戶輸入的值不變
-              const newCompletedCount = updated.length;
-              setScriptData((prev) => {
-                const updatedData = {
-                  ...prev,
-                  completedScenes: newCompletedCount,
-                  // 總場次數保持用戶輸入的值不變
-                };
-                // 立即保存到 localStorage
-                try {
-                  localStorage.setItem('scriptData', JSON.stringify(updatedData));
-                  console.log('✅ 已完成場次數已更新並保存:', newCompletedCount);
-                } catch (err) {
-                  console.error('保存已完成場次數到 localStorage 失敗:', err);
-                }
-                return updatedData;
-              });
-              return updated;
-            });
-          }}
-          allScenes={scenes}
-        />
+        {/* Tab 導航 */}
+        <div className="tabs-container">
+          <div className="tabs-nav">
+            <button
+              className={`tab-btn ${activeTab === 'project' ? 'active' : ''}`}
+              onClick={() => setActiveTab('project')}
+            >
+              專案資訊
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'outline' ? 'active' : ''}`}
+              onClick={() => setActiveTab('outline')}
+            >
+              劇本大綱
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'characters' ? 'active' : ''}`}
+              onClick={() => setActiveTab('characters')}
+            >
+              人物關係圖
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'grouping' ? 'active' : ''}`}
+              onClick={() => setActiveTab('grouping')}
+            >
+              場景統整
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'storyboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('storyboard')}
+            >
+              分鏡圖
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'import' ? 'active' : ''}`}
+              onClick={() => setActiveTab('import')}
+            >
+              資料管理
+            </button>
+          </div>
 
-        <CharacterRelationship 
-          characters={characters}
-          connections={characterConnections}
-          onUpdateCharacters={(updatedCharacters) => {
-            console.log('🔄 [ScriptManager] 收到角色更新:', updatedCharacters.length, '個角色');
-            console.log('🔄 [ScriptManager] 更新前角色數量:', characters.length);
-            console.log('🔄 [ScriptManager] 更新後角色數量:', updatedCharacters.length);
-            console.log('🔄 [ScriptManager] 角色詳細資料:', updatedCharacters);
-            
-            // 確保是陣列
-            if (!Array.isArray(updatedCharacters)) {
-              console.error('❌ [ScriptManager] 接收到的角色資料不是陣列:', typeof updatedCharacters);
-              return;
-            }
-            
-            setCharacters(updatedCharacters);
-            
-            // 立即驗證
-            setTimeout(() => {
-              const current = localStorage.getItem('characters');
-              if (current) {
-                const parsed = JSON.parse(current);
-                console.log('✅ [ScriptManager] 更新後驗證 localStorage:', parsed.length, '個角色');
-                if (parsed.length !== updatedCharacters.length) {
-                  console.error('❌ [ScriptManager] 角色數量不一致！', {
-                    狀態: updatedCharacters.length,
-                    localStorage: parsed.length
+          {/* Tab 內容 */}
+          <div className="tabs-content">
+            {activeTab === 'project' && (
+              <ProjectInfo
+                scriptData={scriptData}
+                onUpdateScriptData={handleUpdateScriptData}
+                onClearProject={handleClearProject}
+              />
+            )}
+
+            {activeTab === 'outline' && (
+              <ScriptOutline
+                outline={outline}
+                onUpdateOutline={handleUpdateOutline}
+                scenes={scenes}
+                onSelectScene={handleSelectScene}
+                onUpdateScene={handleUpdateScene}
+                onDeleteScene={handleDeleteScene}
+                onAddScene={(newScene) => {
+                  setScenes((prev) => {
+                    const updated = [...prev, newScene];
+                    try {
+                      localStorage.setItem('scriptScenes', JSON.stringify(updated));
+                      console.log('✅ 新增場次已保存到 localStorage');
+                    } catch (err) {
+                      console.error('保存場次到 localStorage 失敗:', err);
+                    }
+                    const newCompletedCount = updated.length;
+                    setScriptData((prev) => {
+                      const updatedData = {
+                        ...prev,
+                        completedScenes: newCompletedCount,
+                      };
+                      try {
+                        localStorage.setItem('scriptData', JSON.stringify(updatedData));
+                        console.log('✅ 已完成場次數已更新並保存:', newCompletedCount);
+                      } catch (err) {
+                        console.error('保存已完成場次數到 localStorage 失敗:', err);
+                      }
+                      return updatedData;
+                    });
+                    return updated;
                   });
-                }
-              }
-            }, 50);
-          }}
-          onUpdateConnections={(updatedConnections) => {
-            console.log('🔄 [ScriptManager] 收到關係更新:', updatedConnections.length, '個關係');
-            setCharacterConnections(updatedConnections);
-          }}
-        />
+                }}
+                allScenes={scenes}
+              />
+            )}
 
-        <SceneGrouping
-          scenes={scenes}
-          onSelectScene={(scene) => {
-            setSelectedScene(scene);
-            setShowEditor(true);
-          }}
-        />
+            {activeTab === 'characters' && (
+              <CharacterRelationship
+                characters={characters}
+                connections={characterConnections}
+                onUpdateCharacters={(updatedCharacters) => {
+                  console.log('🔄 [ScriptManager] 收到角色更新:', updatedCharacters.length, '個角色');
+                  if (!Array.isArray(updatedCharacters)) {
+                    console.error('❌ [ScriptManager] 接收到的角色資料不是陣列:', typeof updatedCharacters);
+                    return;
+                  }
+                  setCharacters(updatedCharacters);
+                  setTimeout(() => {
+                    const current = localStorage.getItem('characters');
+                    if (current) {
+                      const parsed = JSON.parse(current);
+                      console.log('✅ [ScriptManager] 更新後驗證 localStorage:', parsed.length, '個角色');
+                      if (parsed.length !== updatedCharacters.length) {
+                        console.error('❌ [ScriptManager] 角色數量不一致！', {
+                          狀態: updatedCharacters.length,
+                          localStorage: parsed.length
+                        });
+                      }
+                    }
+                  }, 50);
+                }}
+                onUpdateConnections={(updatedConnections) => {
+                  console.log('🔄 [ScriptManager] 收到關係更新:', updatedConnections.length, '個關係');
+                  setCharacterConnections(updatedConnections);
+                }}
+              />
+            )}
 
-        <ImportExport
-          scriptData={scriptData}
-          outline={outline}
-          scenes={scenes}
-          onImport={(data) => {
-            if (data.scriptData) setScriptData(data.scriptData);
-            if (data.outline) setOutline(data.outline);
-            if (data.scenes) setScenes(data.scenes);
-          }}
-        />
+            {activeTab === 'grouping' && (
+              <SceneGrouping
+                scenes={scenes}
+                onSelectScene={(scene) => {
+                  setSelectedScene(scene);
+                  setShowEditor(true);
+                }}
+              />
+            )}
+
+            {activeTab === 'storyboard' && (
+              <Storyboard
+                scenes={scenes}
+                onUpdateScene={(updatedScene) => {
+                  const updated = scenes.map(s =>
+                    s.id === updatedScene.id ? updatedScene : s
+                  );
+                  setScenes(updated);
+                }}
+              />
+            )}
+
+            {activeTab === 'import' && (
+              <ImportExport
+                scriptData={scriptData}
+                outline={outline}
+                scenes={scenes}
+                characters={characters}
+                characterConnections={characterConnections}
+                onImport={(data) => {
+                  if (data.scriptData) setScriptData(data.scriptData);
+                  if (data.outline) setOutline(data.outline);
+                  if (data.scenes) setScenes(data.scenes);
+                  if (data.characters) setCharacters(data.characters);
+                  if (data.connections) setCharacterConnections(data.connections);
+                }}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

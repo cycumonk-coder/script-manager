@@ -415,7 +415,19 @@ export async function createNewSpreadsheet(title = '劇本管理平台', folderN
 }
 
 // 上傳圖片到 Google Drive 的 photo 資料夾
-export async function uploadImageToDrive(file, folderName = 'photo', parentFolderName = '劇本管理平台') {
+export async function uploadImageToDrive(file, subFolderName = null, folderName = 'photo', parentFolderName = '劇本管理平台') {
+  // 參數說明：
+  // - file: 要上傳的文件
+  // - subFolderName: 子資料夾名稱（例如 'people' 或 'storyboard'），如果為 null 則直接存儲在 folderName 下
+  // - folderName: 主要資料夾名稱（默認為 'photo'）
+  // - parentFolderName: 父資料夾名稱（默認為 '劇本管理平台'）
+  // 
+  // 資料夾結構：
+  // - 劇本管理平台 (parentFolderName)
+  //   - photo (folderName)
+  //     - people (subFolderName) - 人物圖片
+  //     - storyboard (subFolderName) - 分鏡圖
+  
   const token = getAccessToken();
   
   if (!token) {
@@ -428,7 +440,18 @@ export async function uploadImageToDrive(file, folderName = 'photo', parentFolde
     const parentFolderId = await ensureFolder(parentFolderName);
     
     // 在父資料夾中查找或創建 photo 資料夾
+    console.log('📁 檢查並創建主要資料夾:', folderName);
     const photoFolderId = await ensureFolderInParent(folderName, parentFolderId);
+    
+    // 如果有子資料夾名稱，在 photo 資料夾下創建子資料夾
+    let targetFolderId = photoFolderId;
+    if (subFolderName) {
+      console.log(`📁 檢查並創建子資料夾: ${folderName}/${subFolderName}`);
+      targetFolderId = await ensureFolderInParent(subFolderName, photoFolderId);
+      console.log(`✅ 目標資料夾 ID: ${targetFolderId}`);
+    } else {
+      console.log(`📁 直接使用主要資料夾: ${folderName}`);
+    }
     
     // 壓縮圖片
     const compressedFile = await compressImageFile(file, 800, 800, 0.85);
@@ -437,7 +460,7 @@ export async function uploadImageToDrive(file, folderName = 'photo', parentFolde
     const formData = new FormData();
     const metadata = {
       name: `${Date.now()}_${file.name}`,
-      parents: [photoFolderId]
+      parents: [targetFolderId]  // 使用目標資料夾 ID（可能是子資料夾）
     };
     
     formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -463,27 +486,58 @@ export async function uploadImageToDrive(file, folderName = 'photo', parentFolde
 
     const result = await response.json();
     
-    // 設置文件為公開可讀（用於顯示）
-    if (result.id) {
+    if (!result.id) {
+      throw new Error('上傳成功但未返回文件 ID');
+    }
+    
+    // 設置文件為公開可讀（用於顯示）- 必須設置成功才能正常顯示
+    let permissionSet = false;
+    try {
+      console.log('🔐 開始設置文件公開權限，文件 ID:', result.id);
+      await setFilePublic(result.id);
+      permissionSet = true;
+      console.log('✅ 圖片權限設置成功');
+      
+      // 等待一小段時間確保權限生效（Drive API 有時需要一點時間傳播權限）
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (err) {
+      console.error('❌ 設置文件為公開失敗:', err);
+      console.warn('⚠️ 圖片可能無法正常顯示，請檢查文件權限');
+      // 嘗試再次設置（有時 API 需要重試）
       try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await setFilePublic(result.id);
-      } catch (err) {
-        console.warn('設置文件為公開失敗，但不影響使用:', err);
+        permissionSet = true;
+        console.log('✅ 重試後權限設置成功');
+      } catch (retryErr) {
+        console.error('❌ 重試設置權限也失敗:', retryErr);
       }
     }
     
-    // 返回圖片的共享連結（使用 Google Drive 的圖片預覽 URL）
-    // 這個 URL 可以直接在 <img> 標籤中使用
+    if (!permissionSet) {
+      console.warn('⚠️ 圖片文件權限可能未正確設置，圖片可能無法正常顯示');
+      console.warn('💡 建議：手動在 Google Drive 中設置文件權限為「知道連結的任何人可查看」');
+    }
+    
+    // 返回圖片的共享連結
+    // 使用多種 URL 格式以確保兼容性
     const imageUrl = `https://drive.google.com/uc?export=view&id=${result.id}`;
+    // 備用 URL（直接內容連結）
+    const directImageUrl = result.webContentLink || imageUrl;
     
     console.log('✅ 圖片上傳成功:', result.id);
     console.log('📷 圖片 URL:', imageUrl);
+    console.log('🔗 直接內容連結:', directImageUrl);
     console.log('🔗 圖片查看連結:', result.webViewLink);
+    
+    // 驗證 URL 是否可訪問（可選）
+    // 注意：由於 CORS 限制，這個驗證可能不會成功，但可以嘗試
     
     return {
       fileId: result.id,
       url: imageUrl,  // 用於 <img src>
-      webViewLink: result.webViewLink  // 用於在新分頁中查看
+      directUrl: directImageUrl,  // 備用直接連結
+      webViewLink: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view`  // 用於在新分頁中查看
     };
   } catch (error) {
     console.error('上傳圖片錯誤:', error);
@@ -560,6 +614,28 @@ async function setFilePublic(fileId) {
   }
 
   try {
+    // 先檢查權限是否已存在
+    const checkResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?access_token=${token}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
+
+    if (checkResponse.ok) {
+      const permissions = await checkResponse.json();
+      const hasPublicPermission = permissions.permissions?.some(
+        p => p.type === 'anyone' && p.role === 'reader'
+      );
+      
+      if (hasPublicPermission) {
+        console.log('✅ 文件已有公開讀取權限');
+        return true;
+      }
+    }
+
     // 創建公開讀取權限
     const response = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?access_token=${token}`,
@@ -578,12 +654,17 @@ async function setFilePublic(fileId) {
 
     if (!response.ok) {
       const error = await response.json();
-      // 如果權限已存在，不視為錯誤
-      if (error.error?.code !== 409) {
-        throw new Error(error.error?.message || '設置文件權限失敗');
+      // 如果權限已存在（409），不視為錯誤
+      if (error.error?.code === 409) {
+        console.log('✅ 文件權限已存在');
+        return true;
       }
+      console.error('設置權限錯誤詳情:', error);
+      throw new Error(error.error?.message || '設置文件權限失敗');
     }
 
+    const result = await response.json();
+    console.log('✅ 成功設置文件公開權限:', result.id);
     return true;
   } catch (error) {
     console.error('設置文件權限錯誤:', error);
@@ -637,4 +718,5 @@ function compressImageFile(file, maxWidth = 800, maxHeight = 800, quality = 0.85
     reader.readAsDataURL(file);
   });
 }
+
 

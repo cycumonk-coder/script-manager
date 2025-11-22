@@ -74,6 +74,80 @@
   line-height: 1.6;
 }
 
+.project-info-actions {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.clear-project-btn {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-project-btn:hover {
+  background: #dc2626;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.confirm-clear-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+}
+
+.confirm-message {
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-clear-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-clear-btn.confirm {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.confirm-clear-btn.confirm:hover {
+  background: #dc2626;
+}
+
+.confirm-clear-btn.cancel {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.confirm-clear-btn.cancel:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
 @media (max-width: 768px) {
   .project-info {
     padding: 24px;
@@ -86,6 +160,14 @@
 
   .project-info-field.full-width {
     grid-column: 1;
+  }
+
+  .confirm-buttons {
+    flex-direction: column;
+  }
+
+  .confirm-clear-btn {
+    width: 100%;
   }
 }
 

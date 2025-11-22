@@ -110,88 +110,224 @@ const CharacterRelationship = ({ characters = [], connections = [], onUpdateChar
   };
 
   const handleImageUpload = async (e, isEdit = false) => {
-    const file = e.target.files[0];
-    if (!file || !file.type.startsWith('image/')) return;
-    
-    // 檢查檔案大小（原始檔案）
-    const maxSize = 10 * 1024 * 1024; // 10MB（因為會上傳到 Google Drive，不需要太嚴格）
-    if (file.size > maxSize) {
-      alert('圖片檔案太大，請選擇小於 10MB 的圖片');
+    const file = e?.target?.files?.[0];
+    if (!file) {
+      console.warn('⚠️ [CharacterRelationship] 沒有選擇文件');
+      // 重置文件輸入
+      if (e?.target) {
+        e.target.value = '';
+      }
       return;
     }
+    
+    if (!file.type || !file.type.startsWith('image/')) {
+      alert('請選擇有效的圖片文件（JPG、PNG、GIF等格式）');
+      // 重置文件輸入
+      if (e?.target) {
+        e.target.value = '';
+      }
+      return;
+    }
+    
+    // 檢查檔案大小（原始檔案）
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('圖片檔案太大，請選擇小於 10MB 的圖片');
+      e.target.value = '';
+      return;
+    }
+    
+    // 先壓縮圖片（無論是否連接 Google 都需要）
+    console.log('🖼️ [CharacterRelationship] 開始處理圖片...');
+    const compressedImage = await compressImage(file);
+    console.log('✅ [CharacterRelationship] 圖片壓縮完成，大小:', (compressedImage.length / 1024).toFixed(2), 'KB');
+    
+    // 先顯示壓縮後的預覽（本地）- 作為備用
+    if (isEdit) {
+      setEditCharacterForm({ 
+        ...editCharacterForm, 
+        image: compressedImage, 
+        uploading: true 
+      });
+    } else {
+      setNewCharacter({ 
+        ...newCharacter, 
+        image: compressedImage, 
+        uploading: true 
+      });
+    }
+    
+    // 保存壓縮圖片作為備用（使用閉包保存）
+    const backupImage = compressedImage;
     
     try {
       // 檢查是否已連接 Google
       const { isAuthenticated, uploadImageToDrive } = await import('../services/googleSheets');
       
       if (isAuthenticated()) {
-        // 如果已連接 Google，上傳到 Google Drive
-        console.log('🖼️ [CharacterRelationship] 開始上傳圖片到 Google Drive...');
+        // 如果已連接 Google，嘗試上傳到 Google Drive
+        console.log('🖼️ [CharacterRelationship] 已連接 Google，嘗試上傳到 Google Drive...');
         
-        // 先顯示壓縮後的預覽（本地）
-        const compressedImage = await compressImage(file);
-        if (isEdit) {
-          setEditCharacterForm({ ...editCharacterForm, image: compressedImage, uploading: true });
-        } else {
-          setNewCharacter({ ...newCharacter, image: compressedImage, uploading: true });
-        }
-        
-        // 後台上傳到 Google Drive
         try {
-          const uploadResult = await uploadImageToDrive(file);
-          console.log('✅ [CharacterRelationship] 圖片上傳到 Google Drive 成功:', uploadResult.url);
+          // 人物圖片存儲在 photo/people 資料夾
+          const uploadResult = await uploadImageToDrive(file, 'people');
+          console.log('✅ [CharacterRelationship] 圖片上傳到 Google Drive 成功 (photo/people)');
+          console.log('📷 [CharacterRelationship] 圖片 URL:', uploadResult.url);
+          console.log('📷 [CharacterRelationship] 圖片備用 URL:', uploadResult.directUrl);
+          console.log('🔗 [CharacterRelationship] 查看連結:', uploadResult.webViewLink);
           
-          // 更新為 Google Drive URL
+          // 使用主要 URL
           const finalImageUrl = uploadResult.url;
+          
+          // 驗證 URL 是否有效
+          if (!finalImageUrl || !finalImageUrl.includes('drive.google.com')) {
+            console.warn('⚠️ [CharacterRelationship] 圖片 URL 格式不正確，使用本地壓縮圖片');
+            // 使用本地壓縮圖片
+            if (isEdit) {
+              setEditCharacterForm(prev => ({ 
+                ...prev, 
+                uploading: false,
+                imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+              }));
+            } else {
+              setNewCharacter(prev => ({ 
+                ...prev, 
+                uploading: false,
+                imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+              }));
+            }
+            return;
+          }
+          
+          // 先驗證 URL 是否可以訪問，再更新狀態
+          const testImage = new Image();
+          testImage.crossOrigin = 'anonymous';
+          
+          const urlValidationPromise = new Promise((resolve) => {
+            testImage.onload = () => {
+              console.log('✅ [CharacterRelationship] 圖片 URL 驗證成功，可以訪問');
+              resolve(true);
+            };
+            testImage.onerror = () => {
+              console.warn('⚠️ [CharacterRelationship] 圖片 URL 無法訪問，將使用本地壓縮圖片');
+              console.warn('💡 建議：檢查 Google Drive 文件權限是否設置為「知道連結的任何人可查看」');
+              resolve(false);
+            };
+            testImage.src = finalImageUrl;
+          });
+          
+          // 等待驗證結果（最多 3 秒）
+          const isValid = await Promise.race([
+            urlValidationPromise,
+            new Promise(resolve => setTimeout(() => resolve(true), 3000)) // 超時後假設有效
+          ]);
+          
+          // 更新為 Google Drive URL 或保持 base64
+          if (isValid) {
+            // URL 有效，使用 Google Drive URL
+            if (isEdit) {
+              setEditCharacterForm(prev => ({ 
+                ...prev, 
+                image: finalImageUrl, 
+                uploading: false,
+                imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+              }));
+              console.log('✅ [CharacterRelationship] 編輯表單圖片已更新為 Google Drive URL');
+            } else {
+              setNewCharacter(prev => ({ 
+                ...prev, 
+                image: finalImageUrl, 
+                uploading: false,
+                imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+              }));
+              console.log('✅ [CharacterRelationship] 新建表單圖片已更新為 Google Drive URL');
+            }
+          } else {
+            // URL 無效，保持使用本地壓縮圖片
+            console.log('🔄 [CharacterRelationship] 圖片 URL 無效，保持使用本地壓縮圖片');
+            if (isEdit) {
+              setEditCharacterForm(prev => ({ 
+                ...prev, 
+                uploading: false,
+                // 保持使用壓縮的 base64 圖片
+                imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+              }));
+            } else {
+              setNewCharacter(prev => ({ 
+                ...prev, 
+                uploading: false,
+                // 保持使用壓縮的 base64 圖片
+                imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
+              }));
+            }
+          }
+        } catch (uploadError) {
+          console.error('❌ [CharacterRelationship] 上傳到 Google Drive 失敗:', uploadError);
+          // 如果上傳失敗，使用本地壓縮圖片
+          const errorMessage = uploadError.message || '上傳失敗';
+          console.warn('⚠️ [CharacterRelationship] 使用本地壓縮圖片替代');
+          
           if (isEdit) {
             setEditCharacterForm(prev => ({ 
               ...prev, 
-              image: finalImageUrl, 
               uploading: false,
+              // 保持壓縮後的 base64 圖片
               imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
             }));
           } else {
             setNewCharacter(prev => ({ 
               ...prev, 
-              image: finalImageUrl, 
               uploading: false,
+              // 保持壓縮後的 base64 圖片
               imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
             }));
           }
-        } catch (uploadError) {
-          console.error('❌ [CharacterRelationship] 上傳到 Google Drive 失敗，使用本地圖片:', uploadError);
-          // 如果上傳失敗，繼續使用壓縮後的 base64 圖片
-          if (isEdit) {
-            setEditCharacterForm(prev => ({ ...prev, uploading: false }));
-          } else {
-            setNewCharacter(prev => ({ ...prev, uploading: false }));
-          }
+          
+          // 顯示警告但不阻止使用
+          alert(`上傳到 Google Drive 失敗（${errorMessage}），已使用本地壓縮圖片。圖片已保存，但建議稍後重新上傳以節省本地儲存空間。`);
         }
       } else {
-        // 如果未連接 Google，使用本地壓縮（舊方式）
-        console.log('🖼️ [CharacterRelationship] 未連接 Google，使用本地壓縮圖片...');
-        const compressedImage = await compressImage(file);
-        console.log('✅ [CharacterRelationship] 圖片壓縮完成');
-        console.log('📊 [CharacterRelationship] 壓縮後大小:', (compressedImage.length / 1024).toFixed(2), 'KB');
+        // 如果未連接 Google，使用本地壓縮圖片
+        console.log('🖼️ [CharacterRelationship] 未連接 Google，使用本地壓縮圖片');
         
-        // 未連接 Google 時，使用本地壓縮圖片
         if (isEdit) {
           setEditCharacterForm(prev => ({ 
             ...prev, 
-            image: compressedImage,
+            uploading: false,
             imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
           }));
         } else {
           setNewCharacter(prev => ({ 
             ...prev, 
-            image: compressedImage,
+            uploading: false,
             imagePosition: prev.imagePosition || { x: 0, y: 0, scale: 1 }
           }));
         }
       }
     } catch (error) {
       console.error('❌ [CharacterRelationship] 圖片處理失敗:', error);
-      alert('圖片處理失敗，請重試');
+      
+      // 重置狀態
+      if (isEdit) {
+        setEditCharacterForm(prev => ({ 
+          ...prev, 
+          image: null, 
+          uploading: false 
+        }));
+      } else {
+        setNewCharacter(prev => ({ 
+          ...prev, 
+          image: null, 
+          uploading: false 
+        }));
+      }
+      
+      // 重置文件輸入
+      e.target.value = '';
+      
+      // 顯示錯誤訊息
+      const errorMessage = error.message || '未知錯誤';
+      alert(`圖片處理失敗：${errorMessage}\n\n請確認：\n1. 文件格式是否正確（JPG、PNG、GIF等）\n2. 文件是否損壞\n3. 瀏覽器是否支援圖片處理`);
     }
   };
 

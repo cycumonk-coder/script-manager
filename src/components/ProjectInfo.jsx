@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import './ProjectInfo.css';
 
-const ProjectInfo = ({ scriptData, onUpdateScriptData }) => {
+const ProjectInfo = ({ scriptData, onUpdateScriptData, onClearProject }) => {
   const [title, setTitle] = useState(scriptData?.title || '');
   const [coreIdea, setCoreIdea] = useState(scriptData?.coreIdea || '');
   const [isComposingTitle, setIsComposingTitle] = useState(false);
   const [isComposingIdea, setIsComposingIdea] = useState(false);
   const [compositionTitle, setCompositionTitle] = useState('');
   const [compositionIdea, setCompositionIdea] = useState('');
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
   const isInitialMount = useRef(true);
 
   // 同步 scriptData，確保在載入時能正確顯示資料
@@ -94,11 +95,32 @@ const ProjectInfo = ({ scriptData, onUpdateScriptData }) => {
     setCompositionIdea('');
   };
 
+  const handleClearClick = () => {
+    // 第一次點擊，顯示確認區域
+    setShowConfirmClear(true);
+  };
+
+  const handleConfirmClear = () => {
+    // 第二次確認，彈出最終確認對話框
+    if (window.confirm('⚠️ 確定要清空所有專案內容嗎？\n\n此操作將清空：\n• 專案資訊（片名、中心思想）\n• 劇本大綱\n• 所有場次\n• 角色資料\n• 角色關係\n\n此操作無法復原！')) {
+      if (onClearProject) {
+        onClearProject();
+      }
+      setShowConfirmClear(false);
+      // 清空本地狀態
+      setTitle('');
+      setCoreIdea('');
+      alert('✅ 專案內容已清空');
+    }
+  };
+
+  const handleCancelClear = () => {
+    // 取消時隱藏確認區域
+    setShowConfirmClear(false);
+  };
+
   return (
     <div className="project-info">
-      <div className="project-info-header">
-        <h2 className="project-info-title">專案資訊</h2>
-      </div>
       <div className="project-info-grid">
         <div className="project-info-field">
           <label className="field-label">片名</label>
@@ -124,6 +146,39 @@ const ProjectInfo = ({ scriptData, onUpdateScriptData }) => {
             rows="3"
           />
         </div>
+      </div>
+      
+      {/* 清空專案內容按鈕 */}
+      <div className="project-info-actions">
+        {!showConfirmClear ? (
+          <button 
+            className="clear-project-btn" 
+            onClick={handleClearClick}
+            type="button"
+          >
+            清空專案內容
+          </button>
+        ) : (
+          <div className="confirm-clear-container">
+            <span className="confirm-message">確定要清空所有專案內容嗎？此操作無法復原！</span>
+            <div className="confirm-buttons">
+              <button 
+                className="confirm-clear-btn confirm" 
+                onClick={handleConfirmClear}
+                type="button"
+              >
+                確定清空
+              </button>
+              <button 
+                className="confirm-clear-btn cancel" 
+                onClick={handleCancelClear}
+                type="button"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
