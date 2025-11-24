@@ -144,6 +144,7 @@ const GoogleLogin = ({ onLoginSuccess, onLogout }) => {
   };
 
   const handleAuthError = (error) => {
+    const currentOrigin = window.location.origin;
     let errorMessage = '登入失敗: ' + error;
     
     if (error === 'deleted_client') {
@@ -154,6 +155,8 @@ const GoogleLogin = ({ onLoginSuccess, onLogout }) => {
       errorMessage = '授權被拒絕。請重新嘗試並授予必要的權限。';
     } else if (error === 'popup_closed_by_user') {
       errorMessage = '登入視窗已關閉。';
+    } else if (error.includes('redirect_uri_mismatch') || error === 'redirect_uri_mismatch') {
+      errorMessage = `❌ 重定向 URI 不匹配錯誤！\n\n當前網址：${currentOrigin}\n\n🔧 解決方案：\n\n1. 前往 Google Cloud Console：\n   https://console.cloud.google.com/apis/credentials\n\n2. 找到您的 OAuth 2.0 客戶端 ID（Client ID）\n\n3. 點擊「編輯」按鈕\n\n4. 在「已授權的 JavaScript 來源」中添加以下網址：\n   • ${currentOrigin}\n   • http://localhost:3001（本地開發用）\n   • https://localhost:3001（本地開發用）\n\n5. 在「已授權的重新導向 URI」中添加：\n   • ${currentOrigin}\n   • ${currentOrigin}/\n   • http://localhost:3001\n   • http://localhost:3001/\n\n6. 點擊「儲存」\n\n7. 等待 1-2 分鐘讓設定生效，然後重新整理頁面再試\n\n⚠️ 注意：\n- 不要包含尾隨斜線（除非是根路徑）\n- 確保使用正確的協議（http:// 或 https://）\n- 如果使用自定義域名，也要添加該域名`;
     }
     
     setError(errorMessage);
