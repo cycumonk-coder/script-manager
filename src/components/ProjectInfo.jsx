@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './ProjectInfo.css';
 
-const ProjectInfo = ({ scriptData, onUpdateScriptData, onClearProject }) => {
+const ProjectInfo = ({ scriptData, onUpdateScriptData, onClearProject, onSaveToCloud }) => {
   const [title, setTitle] = useState(scriptData?.title || '');
   const [coreIdea, setCoreIdea] = useState(scriptData?.coreIdea || '');
   const [isComposingTitle, setIsComposingTitle] = useState(false);
@@ -9,6 +9,7 @@ const ProjectInfo = ({ scriptData, onUpdateScriptData, onClearProject }) => {
   const [compositionTitle, setCompositionTitle] = useState('');
   const [compositionIdea, setCompositionIdea] = useState('');
   const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [saving, setSaving] = useState(false);
   const isInitialMount = useRef(true);
 
   // 同步 scriptData，確保在載入時能正確顯示資料
@@ -119,6 +120,20 @@ const ProjectInfo = ({ scriptData, onUpdateScriptData, onClearProject }) => {
     setShowConfirmClear(false);
   };
 
+  const handleSaveToCloud = async () => {
+    if (!onSaveToCloud) return;
+    
+    setSaving(true);
+    try {
+      await onSaveToCloud();
+    } catch (error) {
+      // 錯誤已在父組件處理
+      console.error('保存失敗:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="project-info">
       <div className="project-info-grid">
@@ -148,16 +163,42 @@ const ProjectInfo = ({ scriptData, onUpdateScriptData, onClearProject }) => {
         </div>
       </div>
       
-      {/* 清空專案內容按鈕 */}
+      {/* 專案操作按鈕 */}
       <div className="project-info-actions">
         {!showConfirmClear ? (
-          <button 
-            className="clear-project-btn" 
-            onClick={handleClearClick}
-            type="button"
-          >
-            清空專案內容
-          </button>
+          <div className="project-action-buttons">
+            {onSaveToCloud && (
+              <button 
+                className={`save-to-cloud-btn ${saving ? 'saving' : ''}`}
+                onClick={handleSaveToCloud}
+                type="button"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <div className="save-spinner"></div>
+                    儲存中...
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    儲存到 Google 雲端
+                  </>
+                )}
+              </button>
+            )}
+            <button 
+              className="clear-project-btn" 
+              onClick={handleClearClick}
+              type="button"
+            >
+              清空專案內容
+            </button>
+          </div>
         ) : (
           <div className="confirm-clear-container">
             <span className="confirm-message">確定要清空所有專案內容嗎？此操作無法復原！</span>

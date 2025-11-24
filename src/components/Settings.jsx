@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import GoogleSheetsAuth from './GoogleSheetsAuth';
 import './Settings.css';
 
-const Settings = ({ onClose, onAuthChange, onSpreadsheetReady }) => {
-  const [activeTab, setActiveTab] = useState('google'); // 'google' | 'ai'
+const Settings = ({ onClose, onLogout }) => {
   const [cursorApiKey, setCursorApiKey] = useState('');
 
   useEffect(() => {
@@ -44,77 +42,88 @@ const Settings = ({ onClose, onAuthChange, onSpreadsheetReady }) => {
           <button className="settings-close-btn" onClick={onClose}>×</button>
         </div>
 
-        <div className="settings-tabs">
-          <button
-            className={`settings-tab ${activeTab === 'google' ? 'active' : ''}`}
-            onClick={() => setActiveTab('google')}
-          >
-            Google 雲端
-          </button>
-          <button
-            className={`settings-tab ${activeTab === 'ai' ? 'active' : ''}`}
-            onClick={() => setActiveTab('ai')}
-          >
-            AI 服務
-          </button>
-        </div>
-
         <div className="settings-content">
-          {activeTab === 'google' && (
-            <div className="settings-tab-content">
-              <div className="settings-section">
-                <h3>Google Sheets 雲端同步</h3>
-                <p className="settings-description">
-                  連接到 Google Sheets 以自動同步您的劇本資料到雲端，避免資料遺失。
-                </p>
-                <GoogleSheetsAuth 
-                  onAuthChange={onAuthChange}
-                  onSpreadsheetReady={onSpreadsheetReady}
+          <div className="settings-tab-content">
+            <div className="settings-section">
+              <h3>OpenAI API</h3>
+              <p className="settings-description">
+                用於 AI 潤稿功能。<br/>
+                <strong>重要說明：</strong><br/>
+                • 即使您只有 Cursor 訂閱，沒有 ChatGPT Plus，也可以使用 OpenAI API<br/>
+                • OpenAI API 是獨立的服務，不需要 ChatGPT Plus 訂閱<br/>
+                • 您只需要在 OpenAI 平台註冊帳戶並獲取 API Key 即可<br/>
+                • API 使用按量付費，費用直接從您的 OpenAI 帳戶扣除<br/>
+                • 新帳戶通常有免費額度，用完後需要設置付款方式<br/>
+                <a href="https://platform.openai.com/account/api-keys" target="_blank" rel="noopener noreferrer">
+                  前往 OpenAI 平台獲取 API Key →
+                </a><br/>
+                <a href="https://platform.openai.com/account/billing" target="_blank" rel="noopener noreferrer">
+                  檢查帳單和配額 →
+                </a>
+              </p>
+              <div className="api-key-input-group">
+                <input
+                  type="password"
+                  className="api-key-input"
+                  value={cursorApiKey}
+                  onChange={(e) => setCursorApiKey(e.target.value)}
+                  placeholder="輸入 OpenAI API Key（以 sk- 開頭）..."
                 />
+                <button className="api-key-save-btn" onClick={handleSaveCursor}>
+                  儲存
+                </button>
               </div>
+              <p className="api-key-hint">
+                ✅ 已設定：{cursorApiKey ? '是' : '否'}
+              </p>
+              <p className="settings-warning">
+                ⚠️ API Key 僅存儲在本地瀏覽器中，不會上傳到任何伺服器。
+              </p>
             </div>
-          )}
 
-          {activeTab === 'ai' && (
-            <div className="settings-tab-content">
-              <div className="settings-section">
-                <h3>OpenAI API</h3>
-                <p className="settings-description">
-                  用於 AI 潤稿功能。<br/>
-                  <strong>重要說明：</strong><br/>
-                  • 即使您只有 Cursor 訂閱，沒有 ChatGPT Plus，也可以使用 OpenAI API<br/>
-                  • OpenAI API 是獨立的服務，不需要 ChatGPT Plus 訂閱<br/>
-                  • 您只需要在 OpenAI 平台註冊帳戶並獲取 API Key 即可<br/>
-                  • API 使用按量付費，費用直接從您的 OpenAI 帳戶扣除<br/>
-                  • 新帳戶通常有免費額度，用完後需要設置付款方式<br/>
-                  <a href="https://platform.openai.com/account/api-keys" target="_blank" rel="noopener noreferrer">
-                    前往 OpenAI 平台獲取 API Key →
-                  </a><br/>
-                  <a href="https://platform.openai.com/account/billing" target="_blank" rel="noopener noreferrer">
-                    檢查帳單和配額 →
-                  </a>
+            {onLogout && (
+              <div className="logout-section" style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e2e8f0' }}>
+                <h3 style={{ marginBottom: '12px' }}>帳號管理</h3>
+                <p className="settings-description" style={{ marginBottom: '16px' }}>
+                  Google 雲端功能已自動啟用，登入後即可使用 Google Sheets 和 Google Drive 同步功能。
+                  <br/>
+                  登出後需要重新登入才能使用 Google Cloud 服務。
                 </p>
-                <div className="api-key-input-group">
-                  <input
-                    type="password"
-                    className="api-key-input"
-                    value={cursorApiKey}
-                    onChange={(e) => setCursorApiKey(e.target.value)}
-                    placeholder="輸入 OpenAI API Key（以 sk- 開頭）..."
-                  />
-                  <button className="api-key-save-btn" onClick={handleSaveCursor}>
-                    儲存
-                  </button>
-                </div>
-                <p className="api-key-hint">
-                  ✅ 已設定：{cursorApiKey ? '是' : '否'}
-                </p>
-                <p className="settings-warning">
-                  ⚠️ API Key 僅存儲在本地瀏覽器中，不會上傳到任何伺服器。
-                </p>
+                <button 
+                  className="logout-button"
+                  onClick={() => {
+                    if (window.confirm('確定要登出嗎？登出後需要重新登入才能使用 Google Cloud 服務。')) {
+                      onLogout();
+                      onClose();
+                    }
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = '#dc2626';
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = '#ef4444';
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  登出
+                </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

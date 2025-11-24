@@ -21,11 +21,33 @@ const ImportExport = ({ scriptData, outline, scenes, characters = [], characterC
       exportDate: new Date().toISOString(),
       version: '1.0',
     };
+    
+    // 生成檔名：年月日時分 + 片名 + 完成百分比
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    
+    // 片名（如果沒有則使用預設值）
+    const title = scriptData?.title || '未命名劇本';
+    
+    // 計算完成百分比
+    const totalScenes = scriptData?.totalScenes || 0;
+    const completedScenes = scriptData?.completedScenes || scenes?.length || 0;
+    const completionPercentage = totalScenes > 0 
+      ? Math.round((completedScenes / totalScenes) * 100) 
+      : (scenes?.length > 0 ? 100 : 0);
+    
+    // 組合檔名：年月日時分 + 片名 + 完成百分比
+    const fileName = `${year}${month}${day}${hour}${minute}_${title}_${completionPercentage}%.json`;
+    
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `劇本資料_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

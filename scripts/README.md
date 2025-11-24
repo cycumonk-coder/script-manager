@@ -85,3 +85,5 @@ node scripts/pulp-fiction-parser.js
 - `parseHollywoodScript()` 函數負責解析劇本格式
 - 可以調整正則表達式以匹配不同的劇本格式
 
+
+
